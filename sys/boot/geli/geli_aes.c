@@ -732,7 +732,7 @@ static const u32 rcon[] = {
  *
  * @return	the number of rounds for the given cipher key size.
  */
-static inline int
+static int
 rijndaelKeySetupEnc(u32 rk[/*4*(Nr + 1)*/], const u8 cipherKey[], int keyBits) {
 	int i = 0;
 	u32 temp;
@@ -824,7 +824,7 @@ rijndaelKeySetupEnc(u32 rk[/*4*(Nr + 1)*/], const u8 cipherKey[], int keyBits) {
  *
  * @return	the number of rounds for the given cipher key size.
  */
-static inline int
+static int
 rijndaelKeySetupDec(u32 rk[/*4*(Nr + 1)*/], const u8 cipherKey[], int keyBits) {
 	int Nr, i, j;
 	u32 temp;
@@ -1229,7 +1229,7 @@ rijndaelDecrypt(const u32 rk[/*4*(Nr + 1)*/], int Nr, const u8 ct[16], u8 pt[16]
 	PUTU32(pt + 12, s3);
 }
 
-static inline int
+static int
 rijndael_blockDecrypt(keyInstance *key, BYTE *IV,
 		const BYTE *input, int inputLen, BYTE *outBuffer) {
 	int i, numBlocks;
@@ -1256,7 +1256,7 @@ rijndael_blockDecrypt(keyInstance *key, BYTE *IV,
 	return 128*numBlocks;
 }
 
-static inline int
+static int
 rijndael_makeKey(keyInstance *key, BYTE direction, int keyLen,
 	const char *keyMaterial) {
 	u_int8_t cipherKey[RIJNDAEL_MAXKB];
@@ -1292,7 +1292,7 @@ rijndael_makeKey(keyInstance *key, BYTE direction, int keyLen,
 	return (0);
 }
 
-static inline void
+static void
 rijndael_set_key(rijndael_ctx *ctx, const u_char *key, int bits)
 {
 
@@ -1300,14 +1300,14 @@ rijndael_set_key(rijndael_ctx *ctx, const u_char *key, int bits)
 	rijndaelKeySetupDec(ctx->dk, key, bits);
 }
 
-static inline void
+static void
 rijndael_decrypt(const rijndael_ctx *ctx, const u_char *src, u_char *dst)
 {
 
 	rijndaelDecrypt(ctx->dk, ctx->Nr, src, dst);
 }
 
-static inline void
+static void
 rijndael_encrypt(const rijndael_ctx *ctx, const u_char *src, u_char *dst)
 {
 

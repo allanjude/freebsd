@@ -88,8 +88,8 @@ static char kname[1024];
 static int comspeed = SIOSPD;
 static struct bootinfo bootinfo;
 
-vm_offset_t	high_heap_base;
-uint32_t	bios_basemem, bios_extmem, high_heap_size;
+static vm_offset_t	high_heap_base;
+static uint32_t		bios_basemem, bios_extmem, high_heap_size;
 
 static struct bios_smap smap;
 
@@ -106,8 +106,10 @@ static void load(void);
 static int parse(char *, int *);
 static int dskread(void *, daddr_t, unsigned);
 static uint32_t memsize(void);
+#ifdef GELI
 static int vdev_read(void *vdev __unused, void *priv, off_t off, void *buf,
 	size_t bytes);
+#endif
 
 static void *
 malloc(size_t n)
@@ -125,7 +127,9 @@ malloc(size_t n)
 
 #include "ufsread.c"
 #include "gpt.c"
+#ifdef GELI
 #include "geliimpl.c"
+#endif
 
 static inline int
 xfsread(ufs_ino_t inode, void *buf, size_t nbyte)
@@ -236,8 +240,10 @@ gptinit(void)
 		printf("%s: no UFS partition was found\n", BOOTPROG);
 		return (-1);
 	}
+#ifdef GELI
 	geli_taste(vdev_read, &dsk, (gpttable[curent].ent_lba_end -
 			     gpttable[curent].ent_lba_start));
+#endif
 
 	dsk_meta = 0;
 	return (0);
@@ -277,7 +283,9 @@ main(void)
 	bootinfo.bi_memsizes_valid++;
 	bootinfo.bi_bios_dev = dsk.drive;
 
+#ifdef GELI
 	geli_init();
+#endif
 	/* Process configuration file */
 
 	if (gptinit() != 0)
@@ -563,6 +571,7 @@ dskread(void *buf, daddr_t lba, unsigned nblk)
 
 	err = drvread(&dsk, buf, lba + dsk.start, nblk);
 
+#ifdef GELI
 	if (err == 0 && is_geli(&dsk) == 0) {
 		/* Decrypt 1 block at a time */
 		for (n = 0; n < nblk; n++) {
@@ -571,10 +580,12 @@ dskread(void *buf, daddr_t lba, unsigned nblk)
 				return err;
 		}
 	}
+#endif
 
 	return err;
 }
 
+#ifdef GELI
 /*
  * Read function compartible with the ZFS callback, required to keep the GELI
  * Implementation the same for both UFS and ZFS
@@ -608,3 +619,4 @@ vdev_read(void *vdev __unused, void *priv, off_t off, void *buf, size_t bytes)
 
 	return 0;
 }
+#endif

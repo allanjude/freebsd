@@ -34,6 +34,7 @@ __FBSDID("$FreeBSD: head/usr.sbin/fstyp/geli.c 285426 2015-07-12 19:16:19Z allan
 #include "geli_hmac.c"
 #include "geli_aes.c"
 
+#define ENABLE_AESXTS 1
 #ifdef ENABLE_AESXTS
 #include "geli_opencrypto.c"
 #endif

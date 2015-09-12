@@ -148,6 +148,7 @@ strdup(const char *s)
 	return p;
 }
 
+#ifdef GELI
 #include "geliimpl.c"
 
 /*
@@ -185,6 +186,7 @@ geli_vdev_read(void *vdev __unused, void *priv, off_t off, void *buf, size_t byt
 
 	return 0;
 }
+#endif
 
 #include "zfsimpl.c"
 
@@ -405,10 +407,12 @@ probe_drive(struct dsk *dsk)
     if (vdev_probe(vdev_read, dsk, NULL) == 0)
 	return;
 
+#ifdef GELI
     if (geli_taste(vdev_read, dsk, DEV_BSIZE) == 0) {
 	if (vdev_probe(geli_vdev_read, dsk, NULL) == 0)
 	    return;
     }
+#endif
 
     sec = dmadat->secbuf;
     dsk->start = 0;
@@ -454,7 +458,9 @@ probe_drive(struct dsk *dsk)
 		     * structure now since the vdev now owns this one.
 		     */
 		    dsk = copy_dsk(dsk);
-		} else if (geli_taste(vdev_read, dsk, ent->ent_lba_end - ent->ent_lba_start) == 0) {
+		}
+#ifdef GELI
+		else if (geli_taste(vdev_read, dsk, ent->ent_lba_end - ent->ent_lba_start) == 0) {
 		    /*
 		     * This slice has GELI, check it for ZFS.
 		     */
@@ -466,6 +472,7 @@ probe_drive(struct dsk *dsk)
 			dsk = copy_dsk(dsk);
 		    }
 		}
+#endif
 	    }
 	}
 	slba++;
@@ -485,7 +492,9 @@ trymbr:
 	dsk->part = i;
 	if (vdev_probe(vdev_read, dsk, NULL) == 0) {
 	    dsk = copy_dsk(dsk);
-	} else if (geli_taste(vdev_read, dsk, dp[i].dp_size - dp[i].dp_start) == 0) {
+	}
+#ifdef GELI
+	else if (geli_taste(vdev_read, dsk, dp[i].dp_size - dp[i].dp_start) == 0) {
 	    /*
 	     * This slice has GELI, check it for ZFS.
 	     */
@@ -497,6 +506,7 @@ trymbr:
 		dsk = copy_dsk(dsk);
 	    }
 	}
+#endif
     }
 }
 
@@ -543,7 +553,9 @@ main(void)
 
     autoboot = 1;
 
+#ifdef GELI
     geli_init();
+#endif
     zfs_init();
 
     /*

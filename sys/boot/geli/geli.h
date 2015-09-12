@@ -113,11 +113,49 @@ struct g_eli_metadata {
 	u_char		md_hash[16];	/* MD5 hash. */
 } __packed;
 
+/*
+struct fs_ops geli_ufs_fsops = {
+	"geli_ufs",
+	geli_ufs_open,
+	geli_ufs_close,
+	geli_ufs_read,
+	geli_ufs_write,
+	geli_ufs_seek,
+	geli_ufs_stat,
+	geli_ufs_readdir
+};
+
+struct fs_ops geli_zfs_fsops = {
+	"geli_zfs",
+	geli_zfs_open,
+	geli_zfs_close,
+	geli_zfs_read,
+	geli_zfs_write,
+	geli_zfs_seek,
+	geli_zfs_stat,
+	geli_zfs_readdir
+};
+*/
+
 static __inline int
-eli_metadata_decode_v1v2v3v4v5v6v7(const u_char *data, struct g_eli_metadata *md)
+eli_metadata_decode(const u_char *data, struct g_eli_metadata *md)
 {
 	const u_char *p;
+	int error = 0;
 
+	bcopy(data, md->md_magic, sizeof(md->md_magic));
+	if (strcmp(md->md_magic, "GEOM::ELI") != 0) {
+		printf("No magic: ");
+		for (int i = 0; i < 16; i++) {
+			printf("%c", md->md_magic[i]);
+		}
+		printf("\n");
+	}
+	if (strcmp(md->md_magic, "GEOM::ELI") != 0)
+		return (1);
+	md->md_version = le32dec(data + sizeof(md->md_magic));
+	if (md->md_version < 1 && md->md_version > 7)
+		return (1);
 	p = data + sizeof(md->md_magic) + sizeof(md->md_version);
 	/* XXXALLAN: Make sure runtime flags are set in here */
 	md->md_flags = le32dec(p);	p += sizeof(md->md_flags);
@@ -132,44 +170,11 @@ eli_metadata_decode_v1v2v3v4v5v6v7(const u_char *data, struct g_eli_metadata *md
 	bcopy(p, md->md_mkeys, sizeof(md->md_mkeys)); p += sizeof(md->md_mkeys);
 	/* Don't bother with the MD5 hash in the boot loader */
 	bzero(md->md_hash, sizeof(md->md_hash));
-	return (0);
-}
 
-static __inline int
-eli_metadata_decode(const u_char *data, struct g_eli_metadata *md)
-{
-	int error;
-
-	bcopy(data, md->md_magic, sizeof(md->md_magic));
-	if (strcmp(md->md_magic, "GEOM::ELI") != 0) {
-		printf("No magic: ");
-		for (int i = 0; i < 16; i++) {
-			printf("%c", md->md_magic[i]);
-		}
-		printf("\n");
-	}
-	if (strcmp(md->md_magic, "GEOM::ELI") != 0)
-		return (1);
-	md->md_version = le32dec(data + sizeof(md->md_magic));
-	switch (md->md_version) {
-	case G_ELI_VERSION_00:
-		error = 1;
-		break;
-	case G_ELI_VERSION_01:
-	case G_ELI_VERSION_02:
-	case G_ELI_VERSION_03:
-	case G_ELI_VERSION_04:
-	case G_ELI_VERSION_05:
-	case G_ELI_VERSION_06:
-	case G_ELI_VERSION_07:
-		error = eli_metadata_decode_v1v2v3v4v5v6v7(data, md);
-		break;
-	default:
-		error = 1;
-		break;
-	}
 	return (error);
 }
+
+extern struct fs_ops geli_fsops;
 
 static SLIST_HEAD(geli_list, geli_entry) geli_head = SLIST_HEAD_INITIALIZER(geli_head);
 static struct geli_list *geli_headp;
@@ -181,7 +186,7 @@ static struct geli_entry {
 	uint8_t			ivkey[G_ELI_IVKEYLEN];
 	SHA256_CTX		ivctx;
 	SLIST_ENTRY(geli_entry)	entries;
-} *geli_e, *geli_e_tmp, gent;
+} *geli_e, *geli_e_tmp;
 
 static int geli_count;
 

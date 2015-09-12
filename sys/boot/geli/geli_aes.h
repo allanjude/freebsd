@@ -88,16 +88,16 @@ typedef u_int8_t		BYTE;
 
 /*  Function prototypes  */
 
-static inline int	rijndael_makeKey(keyInstance *, u_int8_t, int, const char *);
+static int	rijndael_makeKey(keyInstance *, u_int8_t, int, const char *);
 
-static inline int	rijndael_blockDecrypt(keyInstance *, u_int8_t *,
+static int	rijndael_blockDecrypt(keyInstance *, u_int8_t *,
 				const u_int8_t *, int, u_int8_t *);
 
-static inline void	rijndael_set_key(rijndael_ctx *, const u_char *, int);
-static inline void	rijndael_decrypt(const rijndael_ctx *, const u_char *, u_char *);
+static void	rijndael_set_key(rijndael_ctx *, const u_char *, int);
+static void	rijndael_decrypt(const rijndael_ctx *, const u_char *, u_char *);
 
-static inline int	rijndaelKeySetupEnc(u_int32_t [/*4*(Nr+1)*/], const u_int8_t [], int);
-static inline int	rijndaelKeySetupDec(u_int32_t [/*4*(Nr+1)*/], const u_int8_t [], int);
+static int	rijndaelKeySetupEnc(u_int32_t [/*4*(Nr+1)*/], const u_int8_t [], int);
+static int	rijndaelKeySetupDec(u_int32_t [/*4*(Nr+1)*/], const u_int8_t [], int);
 static void		rijndaelEncrypt(const u_int32_t [/*4*(Nr+1)*/], int,
 				const u_int8_t [16], u_int8_t [16]);
 static void		rijndaelDecrypt(const u_int32_t [/*4*(Nr+1)*/], int,

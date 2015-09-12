@@ -53,7 +53,7 @@ static void    SHA256_Final(unsigned char [32], SHA256_CTX *);
  * Encode a length len/4 vector of (uint32_t) into a length len vector of
  * (unsigned char) in big-endian form.  Assumes len is a multiple of 4.
  */
-static void
+static inline void
 be32enc_vect(unsigned char *dst, const uint32_t *src, size_t len)
 {
 	size_t i;
@@ -66,7 +66,7 @@ be32enc_vect(unsigned char *dst, const uint32_t *src, size_t len)
  * Decode a big-endian length len vector of (unsigned char) into a length
  * len/4 vector of (uint32_t).  Assumes len is a multiple of 4.
  */
-static void
+static inline void
 be32dec_vect(uint32_t *dst, const unsigned char *src, size_t len)
 {
 	size_t i;
@@ -327,7 +327,7 @@ static void	SHA512_Final(unsigned char [64], SHA512_CTX *);
  * Encode a length len/4 vector of (uint64_t) into a length len vector of
  * (unsigned char) in big-endian form.  Assumes len is a multiple of 8.
  */
-static void
+static inline void
 be64enc_vect(unsigned char *dst, const uint64_t *src, size_t len)
 {
 	size_t i;
@@ -340,7 +340,7 @@ be64enc_vect(unsigned char *dst, const uint64_t *src, size_t len)
  * Decode a big-endian length len vector of (unsigned char) into a length
  * len/4 vector of (uint64_t).  Assumes len is a multiple of 8.
  */
-static void
+static inline void
 be64dec_vect(uint64_t *dst, const unsigned char *src, size_t len)
 {
 	size_t i;

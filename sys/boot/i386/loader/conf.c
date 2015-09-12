@@ -30,6 +30,9 @@ __FBSDID("$FreeBSD$");
 #include <stand.h>
 #include <bootstrap.h>
 #include "libi386/libi386.h"
+#if defined(LOADER_GELI_SUPPORT)
+#include "../geli/geli.h"
+#endif
 #if defined(LOADER_ZFS_SUPPORT)
 #include "../zfs/libzfs.h"
 #endif
@@ -72,7 +75,7 @@ struct devsw *devsw[] = {
 struct fs_ops *file_system[] = {
 #if defined(LOADER_ZFS_SUPPORT)
     &zfs_fsops,
-#endif
+#endif /* LOADER_ZFS_SUPPORT */
     &ufs_fsops,
     &ext2fs_fsops,
     &dosfs_fsops,

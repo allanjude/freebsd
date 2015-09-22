@@ -58,6 +58,9 @@ CFLAGS+=	-DLOADER_GZIP_SUPPORT
 .if defined(LOADER_NANDFS_SUPPORT)
 CFLAGS+=	-DLOADER_NANDFS_SUPPORT
 .endif
+.if !defined(LOADER_NO_GELI_SUPPORT)
+CFLAGS+=	-DGELI
+.endif
 
 # Always add MI sources
 .PATH:		${.CURDIR}/../../common

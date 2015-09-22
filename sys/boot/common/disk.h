@@ -97,6 +97,7 @@ extern int disk_open(struct disk_devdesc *dev, off_t mediasize,
 #define	DISK_F_NOCACHE	0x0001		/* Do not use metadata caching */
 extern int disk_close(struct disk_devdesc *dev);
 extern void disk_cleanup(const struct devsw *d_dev);
+extern int ptblread(void *d, void *buf, size_t blocks, off_t offset);
 
 /*
  * Print information about slices on a disk.

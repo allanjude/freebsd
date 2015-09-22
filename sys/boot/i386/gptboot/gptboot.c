@@ -577,12 +577,12 @@ dskread(void *buf, daddr_t lba, unsigned nblk)
 		for (n = 0; n < nblk; n++) {
 			err = geli_read(&dsk, (lba + n) * DEV_BSIZE, buf + (n * DEV_BSIZE), DEV_BSIZE);
 			if (err)
-				return err;
+				return (err);
 		}
 	}
 #endif
 
-	return err;
+	return (err);
 }
 
 #ifdef GELI
@@ -617,6 +617,6 @@ vdev_read(void *vdev __unused, void *priv, off_t off, void *buf, size_t bytes)
 		bytes -= nb * DEV_BSIZE;
 	}
 
-	return 0;
+	return (0);
 }
 #endif

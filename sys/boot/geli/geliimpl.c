@@ -34,7 +34,7 @@ __FBSDID("$FreeBSD: head/usr.sbin/fstyp/geli.c 285426 2015-07-12 19:16:19Z allan
 #include "geli_hmac.c"
 #include "geli_aes.c"
 
-#define ENABLE_AESXTS 1
+/* #de fine ENABLE_AESXTS 1 */
 #ifdef ENABLE_AESXTS
 #include "geli_opencrypto.c"
 #endif
@@ -64,7 +64,7 @@ geli_taste(int read_func(void *vdev, void *priv, off_t off, void *buf,
 	int error;
 
 	strcpy(passphrase, "test");
-	error = read_func(NULL, dskp, (lastsector) * DEV_BSIZE, &buf, DEV_BSIZE);
+	error = read_func(NULL, dskp, (off_t) lastsector * DEV_BSIZE, &buf, (size_t) DEV_BSIZE);
 	if (error) {
 		return (1);
 	}
@@ -82,7 +82,11 @@ geli_taste(int read_func(void *vdev, void *priv, off_t off, void *buf,
 			/* Disk is a GELI boot device */
 		}
 		geli_e = malloc(sizeof(struct geli_entry));
-		geli_e->dsk = dskp;
+		geli_e->dsk = malloc(sizeof(struct dsk));
+		memcpy(geli_e->dsk, dskp, sizeof(struct dsk));
+		if (dskp->part == 255) {
+			geli_e->dsk->part = dskp->slice;
+		}
 		geli_e->md = md;
 
 		geli_hmac_init(&ctx, NULL, 0);
@@ -134,6 +138,7 @@ geli_taste(int read_func(void *vdev, void *priv, off_t off, void *buf,
 
 		SLIST_INSERT_HEAD(&geli_head, geli_e, entries);
 		geli_count++;
+
 		return (0);
 	}
 
@@ -145,6 +150,10 @@ is_geli(struct dsk *dskp)
 {
 	SLIST_FOREACH_SAFE(geli_e, &geli_head, entries, geli_e_tmp) {
 		if (geli_e->dsk->drive != dskp->drive) {
+			continue;
+		}
+		if (dskp->part == 255 && geli_e->dsk->part != dskp->slice) {
+			/* Right disk, wrong partition */
 			continue;
 		}
 		if (geli_e->dsk->part != dskp->part) {
@@ -167,7 +176,12 @@ geli_read(struct dsk *dskp, off_t offset, u_char *buf, size_t bytes)
 		if (geli_e->dsk->drive != dskp->drive) {
 			continue;
 		}
-		if (geli_e->dsk->part != dskp->part) {
+		if (dskp->part == 255) {
+			if (geli_e->dsk->part != dskp->slice) {
+				/* Right disk, wrong partition */
+				continue;
+			}
+		} else if (geli_e->dsk->part != dskp->part) {
 			/* Right disk, wrong partition */
 			continue;
 		}
@@ -181,7 +195,7 @@ geli_read(struct dsk *dskp, off_t offset, u_char *buf, size_t bytes)
 		    bytes, key, geli_e->md.md_keylen, iv);
 
 		bzero(key, sizeof(key));
-		if (error != 0) {
+		if (error) {
 			return (1);
 		}
 		return (0);
@@ -203,12 +217,14 @@ geli_decrypt(u_int algo, u_char *data, size_t datasize,
 
 	switch (algo) {
 		case CRYPTO_AES_CBC:
-			err = rijndael_makeKey(&aeskey, DIR_DECRYPT, keysize, key);
+			err = rijndael_makeKey(&aeskey, DIR_DECRYPT, keysize,
+			    (const char *)key);
 			if (err) {
 				printf("Failed to setup decryption keys\n");
 				return (err);
 			}
-			blks = rijndael_blockDecrypt(&aeskey, iv, data, datasize * 8, data);
+			blks = rijndael_blockDecrypt(&aeskey, (u_int8_t *)iv,
+			    data, datasize * 8, data);
 			if (datasize != (blks / 8)) {
 				printf("Failed to decrypt the entire input\n");
 				return (1);

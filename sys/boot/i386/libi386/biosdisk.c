@@ -46,8 +46,34 @@ __FBSDID("$FreeBSD$");
 #include <bootstrap.h>
 #include <btxv86.h>
 #include <edd.h>
+#include "drv.h"
 #include "disk.h"
 #include "libi386.h"
+#include "part.h"
+
+#ifdef GELI
+#include <uuid.h>
+struct pentry {
+	struct ptable_entry	part;
+	uint64_t		flags;
+	union {
+		uint8_t bsd;
+		uint8_t	mbr;
+		uuid_t	gpt;
+		uint16_t vtoc8;
+	} type;
+	STAILQ_ENTRY(pentry)	entry;
+};
+struct ptable {
+	enum ptable_type	type;
+	uint16_t		sectorsize;
+	uint64_t		sectors;
+
+	STAILQ_HEAD(, pentry)	entries;
+};
+
+#include "geliimpl.c"
+#endif
 
 CTASSERT(sizeof(struct i386_devdesc) >= sizeof(struct disk_devdesc));
 
@@ -108,6 +134,12 @@ static int bd_ioctl(struct open_file *f, u_long cmd, void *data);
 static void bd_print(int verbose);
 static void bd_cleanup(void);
 
+#ifdef GELI
+int bios_read(void *vdev __unused, struct dsk *priv, off_t off, char *buf,
+    size_t bytes);
+static int geli_status[MAXBDDEV]; /* 0 = unknown, 1 = GELI, 2 = not GELI */
+#endif
+
 struct devsw biosdisk = {
 	"disk",
 	DEVT_DISK,
@@ -154,6 +186,9 @@ bd_init(void)
 {
 	int base, unit, nfd = 0;
 
+#ifdef GELI
+	geli_init();
+#endif
 	/* sequence 0, 0x80 */
 	for (base = 0; base <= 0x80; base += 0x80) {
 		for (unit = base; (nbdinfo < MAXBDDEV); unit++) {
@@ -299,7 +334,8 @@ bd_print(int verbose)
 static int
 bd_open(struct open_file *f, ...)
 {
-	struct disk_devdesc *dev;
+	struct disk_devdesc *dev, rdev;
+	int err, g_err;
 	va_list ap;
 
 	va_start(ap, f);
@@ -309,9 +345,54 @@ bd_open(struct open_file *f, ...)
 	if (dev->d_unit < 0 || dev->d_unit >= nbdinfo)
 		return (EIO);
 
-	return (disk_open(dev, BD(dev).bd_sectors * BD(dev).bd_sectorsize,
+	err = disk_open(dev, BD(dev).bd_sectors * BD(dev).bd_sectorsize,
 	    BD(dev).bd_sectorsize, (BD(dev).bd_flags & BD_FLOPPY) ?
-	    DISK_F_NOCACHE: 0));
+	    DISK_F_NOCACHE: 0);
+
+#ifdef GELI
+	if (err)
+		return (err);
+
+	struct dsk dskp;
+	struct ptable *table = NULL;
+	struct ptable_entry part;
+
+	if (geli_status[dev->d_unit] == 0) {
+		memcpy(&rdev, dev, sizeof(rdev));
+		rdev.d_offset = 0;
+		/* We need the LBA of the end of the partition */
+		table = ptable_open(&rdev, BD(dev).bd_sectors,
+		    BD(dev).bd_sectorsize, ptblread);
+		if (table == NULL) {
+			DEBUG("Can't read partition table");
+			geli_status[dev->d_unit] = 2;
+			/* soft failure, return the exit status of disk_open */
+			return (err);
+		}
+		g_err = ptable_getpart(table, &part, dev->d_slice);
+		if (g_err) {
+			DEBUG("Can't read partition table entry");
+			geli_status[dev->d_unit] = 2;
+			/* soft failure, return the exit status of disk_open */
+			return (err);
+		}
+
+		dskp.drive = bd_unit2bios(dev->d_unit);
+		dskp.type = dev->d_type;
+		dskp.unit = dev->d_unit;
+		dskp.slice = dev->d_slice;
+		dskp.part = dev->d_partition;
+		dskp.start = dev->d_offset;
+
+		g_err = geli_taste(bios_read, &dskp, part.end - part.start);
+		if (g_err == 0)
+			geli_status[dev->d_unit] = 1;
+		else
+			geli_status[dev->d_unit] = 2;
+	}
+#endif
+
+	return (err);
 }
 
 static int
@@ -586,6 +667,37 @@ bd_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest, int write)
 static int
 bd_read(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest)
 {
+#ifdef GELI
+	struct dsk dskp;
+	off_t p_off;
+	int err, n;
+
+	if (geli_status[dev->d_unit] == 1) {
+		err = bd_io(dev, dblk, blks, dest, 0);
+		if (err)
+			return (err);
+
+		dskp.drive = bd_unit2bios(dev->d_unit);
+		dskp.type = dev->d_type;
+		dskp.unit = dev->d_unit;
+		dskp.slice = dev->d_slice;
+		dskp.part = dev->d_partition;
+		dskp.start = dev->d_offset;
+
+		/* GELI needs the offset relative to the partition start */
+		p_off = dblk - dskp.start;
+
+		for (n = 0; n < blks; n++) {
+			err = geli_read(&dskp, (p_off + n) * BIOSDISK_SECSIZE,
+			    dest + (n * BIOSDISK_SECSIZE), BIOSDISK_SECSIZE);
+			if (err)
+				return (err);
+		}
+
+		return (0);
+
+	}
+#endif
 
 	return (bd_io(dev, dblk, blks, dest, 0));
 }
@@ -682,3 +794,25 @@ bd_getdev(struct i386_devdesc *d)
     DEBUG("dev is 0x%x\n", rootdev);
     return(rootdev);
 }
+
+#ifdef GELI
+int
+bios_read(void *vdev __unused, struct dsk *priv, off_t off, char *buf, size_t bytes)
+{
+	struct disk_devdesc dev;
+
+	dev.d_dev = &biosdisk;
+	dev.d_type = priv->type;
+	dev.d_unit = priv->unit;
+	dev.d_slice = priv->slice;
+	dev.d_partition = priv->part;
+	dev.d_offset = priv->start;
+
+	off = off / BIOSDISK_SECSIZE;
+	/* GELI gives us the offset relative to the partition start */
+	off += dev.d_offset;
+	bytes = bytes / BIOSDISK_SECSIZE;
+
+	return (bd_io(&dev, off, bytes, buf, 0));
+}
+#endif

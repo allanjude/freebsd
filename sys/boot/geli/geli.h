@@ -35,6 +35,14 @@ __FBSDID("$FreeBSD: head/usr.sbin/fstyp/geli.c 285426 2015-07-12 19:16:19Z allan
 /* Pull in the sha256 and sha512 implementation */
 #include "shacompat.c"
 
+#ifndef DEV_BSIZE
+#define DEV_BSIZE 512
+#endif
+
+#ifndef MIN
+#define    MIN(a,b) (((a) < (b)) ? (a) : (b))
+#endif
+
 #define CRYPTO_AES_CBC          11
 #define CRYPTO_SHA2_512_HMAC    20
 #define CRYPTO_AES_XTS          22
@@ -113,30 +121,6 @@ struct g_eli_metadata {
 	u_char		md_hash[16];	/* MD5 hash. */
 } __packed;
 
-/*
-struct fs_ops geli_ufs_fsops = {
-	"geli_ufs",
-	geli_ufs_open,
-	geli_ufs_close,
-	geli_ufs_read,
-	geli_ufs_write,
-	geli_ufs_seek,
-	geli_ufs_stat,
-	geli_ufs_readdir
-};
-
-struct fs_ops geli_zfs_fsops = {
-	"geli_zfs",
-	geli_zfs_open,
-	geli_zfs_close,
-	geli_zfs_read,
-	geli_zfs_write,
-	geli_zfs_seek,
-	geli_zfs_stat,
-	geli_zfs_readdir
-};
-*/
-
 static __inline int
 eli_metadata_decode(const u_char *data, struct g_eli_metadata *md)
 {
@@ -180,7 +164,7 @@ static SLIST_HEAD(geli_list, geli_entry) geli_head = SLIST_HEAD_INITIALIZER(geli
 static struct geli_list *geli_headp;
 static struct geli_entry {
 	struct dsk		*dsk;
-	struct g_eli_metadata 	md;
+	struct g_eli_metadata	md;
 	uint8_t			mkey[G_ELI_DATAIVKEYLEN];
 	uint8_t			ekey[G_ELI_DATAKEYLEN];
 	uint8_t			ivkey[G_ELI_IVKEYLEN];

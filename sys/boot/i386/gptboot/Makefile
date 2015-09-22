@@ -22,7 +22,7 @@ GPTBOOT_UFS?=	UFS1_AND_UFS2
 
 CFLAGS=	-DBOOTPROG=\"gptboot\" \
 	-O1 \
-	-DGPT -DGELI \
+	-DGPT
 	-D${GPTBOOT_UFS} \
 	-DSIOPRT=${BOOT_COMCONSOLE_PORT} \
 	-DSIOFMT=${B2SIOFMT} \
@@ -39,6 +39,10 @@ CFLAGS=	-DBOOTPROG=\"gptboot\" \
 	-Winline
 
 CFLAGS.gcc+=	--param max-inline-insns-single=100
+
+.if !defined(LOADER_NO_GELI_SUPPORT)
+CFLAGS+=	-DGELI
+.endif
 
 LD_FLAGS=-static -N --gc-sections
 

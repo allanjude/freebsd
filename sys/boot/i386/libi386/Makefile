@@ -30,7 +30,7 @@ CFLAGS+=	-DCOMSPEED=${BOOT_COMCONSOLE_SPEED}
 CFLAGS+= -DDISK_DEBUG
 .endif
 
-.ifdef(GELI)
+.if !defined(LOADER_NO_GELI_SUPPORT)
 # Decrypt encrypted drives
 CFLAGS+= -DGELI
 CFLAGS+= -I${.CURDIR}/../../geli

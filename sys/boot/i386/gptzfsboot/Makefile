@@ -19,14 +19,13 @@ ORG2=	0x0
 
 CFLAGS=	-DBOOTPROG=\"gptzfsboot\" \
 	-O1 \
-	-DGPT -DGELI -DBOOT2 \
+	-DGPT -DBOOT2 \
 	-DSIOPRT=${BOOT_COMCONSOLE_PORT} \
 	-DSIOFMT=${B2SIOFMT} \
 	-DSIOSPD=${BOOT_COMCONSOLE_SPEED} \
 	-I${.CURDIR}/../../common \
 	-I${.CURDIR}/../common \
 	-I${.CURDIR}/../../zfs \
-	-I${.CURDIR}/../../geli \
 	-I${.CURDIR}/../../../cddl/boot/zfs \
 	-I${.CURDIR}/../btx/lib -I. \
 	-I${.CURDIR}/../boot2 \
@@ -35,6 +34,11 @@ CFLAGS=	-DBOOTPROG=\"gptzfsboot\" \
 	-Wmissing-declarations -Wmissing-prototypes -Wnested-externs \
 	-Wpointer-arith -Wshadow -Wstrict-prototypes -Wwrite-strings \
 	-Winline
+
+.if !defined(LOADER_NO_GELI_SUPPORT)
+CFLAGS+=	-DGELI
+CFLAGS+=	-I${.CURDIR}/../../geli
+.endif
 
 CFLAGS.gcc+=	--param max-inline-insns-single=100
 

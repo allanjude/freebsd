@@ -242,7 +242,7 @@ gptinit(void)
 	}
 #ifdef GELI
 	geli_taste(vdev_read, &dsk, (gpttable[curent].ent_lba_end -
-			     gpttable[curent].ent_lba_start));
+	     gpttable[curent].ent_lba_start));
 #endif
 
 	dsk_meta = 0;
@@ -573,12 +573,10 @@ dskread(void *buf, daddr_t lba, unsigned nblk)
 
 #ifdef GELI
 	if (err == 0 && is_geli(&dsk) == 0) {
-		/* Decrypt 1 block at a time */
-		for (n = 0; n < nblk; n++) {
-			err = geli_read(&dsk, (lba + n) * DEV_BSIZE, buf + (n * DEV_BSIZE), DEV_BSIZE);
-			if (err)
-				return (err);
-		}
+		/* Decrypt */
+		if (geli_read(&dsk, lba * DEV_BSIZE,
+		    buf, nblk * DEV_BSIZE))
+			return (err);
 	}
 #endif
 

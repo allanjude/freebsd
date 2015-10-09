@@ -34,7 +34,7 @@ __FBSDID("$FreeBSD: head/usr.sbin/fstyp/geli.c 285426 2015-07-12 19:16:19Z allan
 #include "geli_hmac.c"
 #include "geli_aes.c"
 
-/* #de fine ENABLE_AESXTS 1 */
+#define ENABLE_AESXTS 1
 #ifdef ENABLE_AESXTS
 #include "geli_opencrypto.c"
 #endif
@@ -73,76 +73,74 @@ geli_taste(int read_func(void *vdev, void *priv, off_t off, void *buf,
 		return (1);
 	}
 
-	if (strcmp(md.md_magic, "GEOM::ELI") == 0) {
-		if ((md.md_flags & G_ELI_FLAG_ONETIME)) {
-			/* Swap device, skip it */
-			return (1);
-		}
-		if ((md.md_flags & G_ELI_FLAG_BOOT)) {
-			/* Disk is a GELI boot device */
-		}
-		geli_e = malloc(sizeof(struct geli_entry));
-		geli_e->dsk = malloc(sizeof(struct dsk));
-		memcpy(geli_e->dsk, dskp, sizeof(struct dsk));
-		if (dskp->part == 255) {
-			geli_e->dsk->part = dskp->slice;
-		}
-		geli_e->md = md;
+	if ((md.md_flags & G_ELI_FLAG_ONETIME)) {
+		/* Swap device, skip it */
+		return (1);
+	}
+	if ((md.md_flags & G_ELI_FLAG_BOOT)) {
+		/* Disk is a GELI boot device */
+	}
+	geli_e = malloc(sizeof(struct geli_entry));
+	geli_e->dsk = malloc(sizeof(struct dsk));
+	memcpy(geli_e->dsk, dskp, sizeof(struct dsk));
+	geli_e->part_end = lastsector;
+	/* XXX fix this */
+	if (dskp->part == 255) {
+		geli_e->dsk->part = dskp->slice;
+	}
+	geli_e->md = md;
 
-		geli_hmac_init(&ctx, NULL, 0);
-		/*
-		 * Prepare Derived-Key from the user passphrase.
-		 */
-		if (geli_e->md.md_iterations == 0) {
-			geli_hmac_update(&ctx, geli_e->md.md_salt,
-			    sizeof(geli_e->md.md_salt));
-			geli_hmac_update(&ctx, passphrase, strlen(passphrase));
-			bzero(passphrase, sizeof(passphrase));
-		} else if (geli_e->md.md_iterations > 0) {
-			u_char dkey[G_ELI_USERKEYLEN];
+	geli_hmac_init(&ctx, NULL, 0);
+	/*
+	 * Prepare Derived-Key from the user passphrase.
+	 */
+	if (geli_e->md.md_iterations == 0) {
+		geli_hmac_update(&ctx, geli_e->md.md_salt,
+		    sizeof(geli_e->md.md_salt));
+		geli_hmac_update(&ctx, passphrase, strlen(passphrase));
+		bzero(passphrase, sizeof(passphrase));
+	} else if (geli_e->md.md_iterations > 0) {
+		u_char dkey[G_ELI_USERKEYLEN];
 
-			pkcs5v2_genkey(dkey, sizeof(dkey), geli_e->md.md_salt,
-			    sizeof(geli_e->md.md_salt), passphrase, geli_e->md.md_iterations);
-			bzero(passphrase, sizeof(passphrase));
-			geli_hmac_update(&ctx, dkey, sizeof(dkey));
-			bzero(dkey, sizeof(dkey));
-		}
-
-		geli_hmac_final(&ctx, key, 0);
-
-		error = geli_mkey_decrypt(geli_e, key, mkey, &keynum);
-
-		if (error) {
-			printf("Failed to decrypt GELI master key: %d\n", error);
-			return (1);
-		}
-
-		/* Store the keys */
-		bcopy(mkey, geli_e->mkey, sizeof(geli_e->mkey));
-		bcopy(mkey, geli_e->ivkey, sizeof(geli_e->ivkey));
-		mkp = mkey + sizeof(geli_e->ivkey);
-		if ((geli_e->md.md_flags & G_ELI_FLAG_AUTH) == 0) {
-			bcopy(mkp, geli_e->ekey, G_ELI_DATAKEYLEN);
-		} else {
-			/*
-			 * The encryption key is: ekey = HMAC_SHA512(Data-Key, 0x10)
-			 */
-			geli_hmac(mkp, G_ELI_MAXKEYLEN, "\x10", 1,
-			    geli_e->ekey, 0);
-		}
-
-		/* Initialize the per-sector IV */
-		SHA256_Init(&geli_e->ivctx);
-		SHA256_Update(&geli_e->ivctx, geli_e->ivkey,
-		    sizeof(geli_e->ivkey));
-
-		SLIST_INSERT_HEAD(&geli_head, geli_e, entries);
-		geli_count++;
-
-		return (0);
+		pkcs5v2_genkey(dkey, sizeof(dkey), geli_e->md.md_salt,
+		    sizeof(geli_e->md.md_salt), passphrase, geli_e->md.md_iterations);
+		bzero(passphrase, sizeof(passphrase));
+		geli_hmac_update(&ctx, dkey, sizeof(dkey));
+		bzero(dkey, sizeof(dkey));
 	}
 
-	return (1);
+	geli_hmac_final(&ctx, key, 0);
+
+	error = geli_mkey_decrypt(geli_e, key, mkey, &keynum);
+
+	if (error) {
+		printf("Failed to decrypt GELI master key: %d\n", error);
+		return (1);
+	}
+
+	/* Store the keys */
+	bcopy(mkey, geli_e->mkey, sizeof(geli_e->mkey));
+	bcopy(mkey, geli_e->ivkey, sizeof(geli_e->ivkey));
+	mkp = mkey + sizeof(geli_e->ivkey);
+	if ((geli_e->md.md_flags & G_ELI_FLAG_AUTH) == 0) {
+		bcopy(mkp, geli_e->ekey, G_ELI_DATAKEYLEN);
+	} else {
+		/*
+		 * The encryption key is: ekey = HMAC_SHA512(Data-Key, 0x10)
+		 */
+		geli_hmac(mkp, G_ELI_MAXKEYLEN, "\x10", 1,
+		    geli_e->ekey, 0);
+	}
+
+	/* Initialize the per-sector IV */
+	SHA256_Init(&geli_e->ivctx);
+	SHA256_Update(&geli_e->ivctx, geli_e->ivkey,
+	    sizeof(geli_e->ivkey));
+
+	SLIST_INSERT_HEAD(&geli_head, geli_e, entries);
+	geli_count++;
+
+	return (0);
 }
 
 static int
@@ -152,8 +150,12 @@ is_geli(struct dsk *dskp)
 		if (geli_e->dsk->drive != dskp->drive) {
 			continue;
 		}
-		if (dskp->part == 255 && geli_e->dsk->part != dskp->slice) {
-			/* Right disk, wrong partition */
+		if (dskp->part == 255 && geli_e->dsk->part == dskp->slice) {
+			/* Sometimes we track slice, sometimes part :( */
+			return (0);
+		}
+		if (geli_e->dsk->slice != dskp->slice) {
+			/* Right disk, wrong slice */
 			continue;
 		}
 		if (geli_e->dsk->part != dskp->part) {
@@ -170,7 +172,10 @@ static int
 geli_read(struct dsk *dskp, off_t offset, u_char *buf, size_t bytes)
 {
 	u_char iv[G_ELI_IVKEYLEN], key[G_ELI_DATAKEYLEN];
+	u_char *pbuf;
 	int error;
+	off_t os;
+	size_t n, nb;
 
 	SLIST_FOREACH_SAFE(geli_e, &geli_head, entries, geli_e_tmp) {
 		if (geli_e->dsk->drive != dskp->drive) {
@@ -181,23 +186,36 @@ geli_read(struct dsk *dskp, off_t offset, u_char *buf, size_t bytes)
 				/* Right disk, wrong partition */
 				continue;
 			}
-		} else if (geli_e->dsk->part != dskp->part) {
-			/* Right disk, wrong partition */
-			continue;
+		} else {
+			if (geli_e->dsk->slice != dskp->slice) {
+				/* Right disk, wrong partition */
+				continue;
+			} else if (geli_e->dsk->part != dskp->part) {
+				/* Right disk, wrong partition */
+				continue;
+			}
 		}
 
-		geli_ivgen(geli_e, offset, iv, G_ELI_IVKEYLEN);
+		nb = bytes / DEV_BSIZE;
+		for (n = 0; n < nb; n++) {
+			os = offset + (n * DEV_BSIZE);
+			pbuf = buf + (n * DEV_BSIZE);
 
-		/* Get the key that corresponds to this offset */
-		geli_key(geli_e, offset, key);
+			geli_ivgen(geli_e, os, iv, G_ELI_IVKEYLEN);
 
-		error = geli_decrypt(geli_e->md.md_ealgo, buf,
-		    bytes, key, geli_e->md.md_keylen, iv);
+			/* Get the key that corresponds to this offset */
+			geli_key(geli_e, os, key);
+
+			error = geli_decrypt(geli_e->md.md_ealgo, pbuf,
+			    DEV_BSIZE, key, geli_e->md.md_keylen, iv);
+
+			if (error) {
+				bzero(key, sizeof(key));
+				return (1);
+			}
+		}
 
 		bzero(key, sizeof(key));
-		if (error) {
-			return (1);
-		}
 		return (0);
 	}
 

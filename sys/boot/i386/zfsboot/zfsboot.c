@@ -176,7 +176,8 @@ geli_vdev_read(void *vdev __unused, void *priv, off_t off, void *buf, size_t byt
 		if (drvread(dsk, dmadat->rdbuf, lba, nb))
 			return -1;
 		/* decrypt */
-		if (geli_read(dsk, off, dmadat->rdbuf, nb * DEV_BSIZE))
+		if (geli_read(dsk, ((lba - dsk->start) * DEV_BSIZE),
+		    dmadat->rdbuf, nb * DEV_BSIZE))
 			return -1;
 		memcpy(p, dmadat->rdbuf, nb * DEV_BSIZE);
 		p += nb * DEV_BSIZE;

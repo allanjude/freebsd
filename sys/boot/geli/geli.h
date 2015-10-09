@@ -128,13 +128,13 @@ eli_metadata_decode(const u_char *data, struct g_eli_metadata *md)
 	int error = 0;
 
 	bcopy(data, md->md_magic, sizeof(md->md_magic));
-	if (strcmp(md->md_magic, "GEOM::ELI") != 0) {
-		printf("No magic: ");
+#if 0
+		printf("Magic: ");
 		for (int i = 0; i < 16; i++) {
 			printf("%c", md->md_magic[i]);
 		}
 		printf("\n");
-	}
+#endif
 	if (strcmp(md->md_magic, "GEOM::ELI") != 0)
 		return (1);
 	md->md_version = le32dec(data + sizeof(md->md_magic));
@@ -164,6 +164,7 @@ static SLIST_HEAD(geli_list, geli_entry) geli_head = SLIST_HEAD_INITIALIZER(geli
 static struct geli_list *geli_headp;
 static struct geli_entry {
 	struct dsk		*dsk;
+	off_t			part_end;
 	struct g_eli_metadata	md;
 	uint8_t			mkey[G_ELI_DATAIVKEYLEN];
 	uint8_t			ekey[G_ELI_DATAKEYLEN];

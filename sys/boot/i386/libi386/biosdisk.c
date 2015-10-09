@@ -46,12 +46,13 @@ __FBSDID("$FreeBSD$");
 #include <bootstrap.h>
 #include <btxv86.h>
 #include <edd.h>
-#include "drv.h"
 #include "disk.h"
 #include "libi386.h"
-#include "part.h"
 
 #ifdef GELI
+#include "drv.h"
+#include "gpt.h"
+#include "part.h"
 #include <uuid.h>
 struct pentry {
 	struct ptable_entry	part;
@@ -135,9 +136,15 @@ static void bd_print(int verbose);
 static void bd_cleanup(void);
 
 #ifdef GELI
+static enum isgeli {
+	ISGELI_UNKNOWN,
+	ISGELI_NO,
+	ISGELI_YES
+};
+static enum isgeli geli_status[MAXBDDEV][MAXTBLENTS];
+
 int bios_read(void *vdev __unused, struct dsk *priv, off_t off, char *buf,
     size_t bytes);
-static int geli_status[MAXBDDEV]; /* 0 = unknown, 1 = GELI, 2 = not GELI */
 #endif
 
 struct devsw biosdisk = {
@@ -353,42 +360,57 @@ bd_open(struct open_file *f, ...)
 	if (err)
 		return (err);
 
+	/* if we already know there is no GELI, skip the rest */
+	if (geli_status[dev->d_unit][dev->d_slice] != ISGELI_UNKNOWN)
+		return (err);
+
 	struct dsk dskp;
 	struct ptable *table = NULL;
 	struct ptable_entry part;
+	struct pentry *entry;
+	int geli_part = 0;
 
-	if (geli_status[dev->d_unit] == 0) {
-		memcpy(&rdev, dev, sizeof(rdev));
-		rdev.d_offset = 0;
-		/* We need the LBA of the end of the partition */
-		table = ptable_open(&rdev, BD(dev).bd_sectors,
-		    BD(dev).bd_sectorsize, ptblread);
-		if (table == NULL) {
-			DEBUG("Can't read partition table");
-			geli_status[dev->d_unit] = 2;
-			/* soft failure, return the exit status of disk_open */
-			return (err);
+	dskp.drive = bd_unit2bios(dev->d_unit);
+	dskp.type = dev->d_type;
+	dskp.unit = dev->d_unit;
+	dskp.slice = dev->d_slice;
+	dskp.part = dev->d_partition;
+	dskp.start = dev->d_offset;
+
+	memcpy(&rdev, dev, sizeof(rdev));
+	/* to read the GPT table, we need to read the first sector */
+	rdev.d_offset = 0;
+	/* We need the LBA of the end of the partition */
+	table = ptable_open(&rdev, BD(dev).bd_sectors,
+	    BD(dev).bd_sectorsize, ptblread);
+	if (table == NULL) {
+		DEBUG("Can't read partition table");
+		/* soft failure, return the exit status of disk_open */
+		return (err);
+	}
+
+	if (table->type == PTABLE_GPT)
+		dskp.part = 255;
+
+	STAILQ_FOREACH(entry, &table->entries, entry) {
+		dskp.slice = entry->part.index;
+		dskp.start = entry->part.start;
+		if (is_geli(&dskp) == 0) {
+			geli_status[dev->d_unit][dskp.slice] = ISGELI_YES;
+			return (0);
 		}
-		g_err = ptable_getpart(table, &part, dev->d_slice);
-		if (g_err) {
-			DEBUG("Can't read partition table entry");
-			geli_status[dev->d_unit] = 2;
-			/* soft failure, return the exit status of disk_open */
-			return (err);
-		}
+		if (geli_taste(bios_read, &dskp,
+		    entry->part.end - entry->part.start) == 0) {
+			geli_status[dev->d_unit][dskp.slice] = ISGELI_YES;
+			geli_part++;
+		} else
+			geli_status[dev->d_unit][dskp.slice] = ISGELI_NO;
+	}
 
-		dskp.drive = bd_unit2bios(dev->d_unit);
-		dskp.type = dev->d_type;
-		dskp.unit = dev->d_unit;
-		dskp.slice = dev->d_slice;
-		dskp.part = dev->d_partition;
-		dskp.start = dev->d_offset;
-
-		g_err = geli_taste(bios_read, &dskp, part.end - part.start);
-		if (g_err == 0)
-			geli_status[dev->d_unit] = 1;
-		else
-			geli_status[dev->d_unit] = 2;
+	/* none of the partitions on this disk have GELI */
+	if (geli_part == 0) {
+		/* found no GELI */
+		geli_status[dev->d_unit][dev->d_slice] = ISGELI_NO;
 	}
 #endif
 
@@ -672,7 +694,11 @@ bd_read(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest)
 	off_t p_off;
 	int err, n;
 
-	if (geli_status[dev->d_unit] == 1) {
+	/* if we already know there is no GELI, skip the rest */
+	if (geli_status[dev->d_unit][dev->d_slice] != ISGELI_YES)
+		return (bd_io(dev, dblk, blks, dest, 0));
+
+	if (geli_status[dev->d_unit][dev->d_slice] == ISGELI_YES) {
 		err = bd_io(dev, dblk, blks, dest, 0);
 		if (err)
 			return (err);
@@ -687,15 +713,12 @@ bd_read(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest)
 		/* GELI needs the offset relative to the partition start */
 		p_off = dblk - dskp.start;
 
-		for (n = 0; n < blks; n++) {
-			err = geli_read(&dskp, (p_off + n) * BIOSDISK_SECSIZE,
-			    dest + (n * BIOSDISK_SECSIZE), BIOSDISK_SECSIZE);
-			if (err)
-				return (err);
-		}
+		err = geli_read(&dskp, p_off * BIOSDISK_SECSIZE, dest,
+		    blks * BIOSDISK_SECSIZE);
+		if (err)
+			return (err);
 
 		return (0);
-
 	}
 #endif
 

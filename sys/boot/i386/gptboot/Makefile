@@ -28,7 +28,6 @@ CFLAGS=	-DBOOTPROG=\"gptboot\" \
 	-DSIOFMT=${B2SIOFMT} \
 	-DSIOSPD=${BOOT_COMCONSOLE_SPEED} \
 	-I${.CURDIR}/../../common \
-	-I${.CURDIR}/../../geli \
 	-I${.CURDIR}/../common \
 	-I${.CURDIR}/../btx/lib -I. \
 	-I${.CURDIR}/../boot2 \
@@ -42,6 +41,7 @@ CFLAGS.gcc+=	--param max-inline-insns-single=100
 
 .if !defined(LOADER_NO_GELI_SUPPORT)
 CFLAGS+=	-DGELI
+CFLAGS+=	-I${.CURDIR}/../../geli
 .endif
 
 LD_FLAGS=-static -N --gc-sections
@@ -86,5 +86,5 @@ machine:
 .include <bsd.prog.mk>
 
 # XXX: clang integrated-as doesn't grok .codeNN directives yet
-CFLAGS.gptldr.S=	${CLANG_NO_IAS}
+CFLAGS.gptldr.S=	${CLANG_NO_IAS} -g
 CFLAGS+=		${CFLAGS.${.IMPSRC:T}}

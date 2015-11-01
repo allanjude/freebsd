@@ -27,10 +27,14 @@
 
 __FBSDID("$FreeBSD: head/usr.sbin/fstyp/geli.c 285426 2015-07-12 19:16:19Z allanjude $");
 
-#define _STRING_H_	/* Fake this since it comes from util.c */
-
 #include <sys/endian.h>
 #include <sys/queue.h>
+
+/*
+#include <crypto/rijndael/rijndael-alg-fst.c>
+#include <crypto/rijndael/rijndael-api-fst.c>
+#include <crypto/rijndael/rijndael-api.c>
+*/
 
 /* Pull in the sha256 and sha512 implementation */
 #include "shacompat.c"
@@ -143,6 +147,16 @@ eli_metadata_decode(const u_char *data, struct g_eli_metadata *md)
 	p = data + sizeof(md->md_magic) + sizeof(md->md_version);
 	/* XXXALLAN: Make sure runtime flags are set in here */
 	md->md_flags = le32dec(p);	p += sizeof(md->md_flags);
+	if (md->md_version < G_ELI_VERSION_04)
+		md->md_flags |= G_ELI_FLAG_NATIVE_BYTE_ORDER;
+	if (md->md_version < G_ELI_VERSION_05)
+		md->md_flags |= G_ELI_FLAG_SINGLE_KEY;
+	if (md->md_version < G_ELI_VERSION_06 &&
+	    (md->md_flags & G_ELI_FLAG_AUTH) != 0) {
+		md->md_flags |= G_ELI_FLAG_FIRST_KEY;
+	}
+	if (md->md_version < G_ELI_VERSION_07)
+		md->md_flags |= G_ELI_FLAG_ENC_IVKEY;
 	md->md_ealgo = le16dec(p);	p += sizeof(md->md_ealgo);
 	md->md_keylen = le16dec(p);	p += sizeof(md->md_keylen);
 	md->md_aalgo = le16dec(p);	p += sizeof(md->md_aalgo);

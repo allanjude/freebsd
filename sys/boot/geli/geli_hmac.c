@@ -177,7 +177,8 @@ geli_mkey_decrypt(struct geli_entry *gep, const unsigned char *key,
 		if (!(gep->md.md_keys & bit))
 			continue;
 		bcopy(mmkey, tmpmkey, G_ELI_MKEYLEN);
-		error = geli_decrypt(gep->md.md_ealgo, tmpmkey,
+		/* gep->md.md_ealgo */
+		error = geli_decrypt(CRYPTO_AES_CBC, tmpmkey,
 		    G_ELI_MKEYLEN, enckey, gep->md.md_keylen, ivkey);
 		if (error != 0) {
 			bzero(tmpmkey, sizeof(tmpmkey));

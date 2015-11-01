@@ -452,7 +452,8 @@ probe_drive(struct dsk *dsk)
 	    if (memcmp(&ent->ent_type, &freebsd_zfs_uuid,
 		     sizeof(uuid_t)) == 0) {
 		dsk->start = ent->ent_lba_start;
-		dsk->part = part;
+		dsk->slice = part + 1;
+		dsk->part = 255;
 		if (vdev_probe(vdev_read, dsk, NULL) == 0) {
 		    /*
 		     * This slice had a vdev. We need a new dsk
@@ -490,7 +491,7 @@ trymbr:
 	if (!dp[i].dp_typ)
 	    continue;
 	dsk->start = dp[i].dp_start;
-	dsk->part = i;
+	dsk->slice = i + 1;
 	if (vdev_probe(vdev_read, dsk, NULL) == 0) {
 	    dsk = copy_dsk(dsk);
 	}

@@ -62,9 +62,8 @@ struct aes_xts_ctx {
 };
 
 static void
-aes_xts_reinit(caddr_t key, const u_int8_t *iv)
+aes_xts_reinit(struct aes_xts_ctx *ctx, u_int8_t *iv)
 {
-	struct aes_xts_ctx *ctx = (struct aes_xts_ctx *)key;
 	u_int64_t blocknum;
 	u_int i;
 
@@ -114,41 +113,41 @@ aes_xts_crypt(struct aes_xts_ctx *ctx, u_int8_t *data, u_int do_encrypt)
 }
 
 static void
-aes_xts_encrypt(caddr_t key, u_int8_t *data)
+aes_xts_encrypt(struct aes_xts_ctx *key, u_int8_t *data)
 {
-	aes_xts_crypt((struct aes_xts_ctx *)key, data, 1);
+	aes_xts_crypt(key, data, 1);
 }
 
 static void
-aes_xts_decrypt(caddr_t key, u_int8_t *data)
+aes_xts_decrypt(struct aes_xts_ctx *key, u_int8_t *data)
 {
-	aes_xts_crypt((struct aes_xts_ctx *)key, data, 0);
+	aes_xts_crypt(key, data, 0);
 }
 
 static void
-aes_xts_decrypt_block(caddr_t key, u_int8_t *data, int datasize)
+aes_xts_decrypt_block(struct aes_xts_ctx *key, u_int8_t *data, int datasize)
 {
 	int i;
 
 	for (i = 0; i < datasize; i += AES_XTS_BLOCKSIZE) {
-		aes_xts_crypt((struct aes_xts_ctx *)key, data + i, 0);
+		aes_xts_crypt(key, data + i, 0);
 	}
 }
 
 static int
-aes_xts_setkey(u_int8_t **sched, const u_int8_t *key, int len)
+aes_xts_setkey(u_int8_t *sched, const u_int8_t *key, int len)
 {
 	struct aes_xts_ctx *ctx;
 
 	if (len != 32 && len != 64)
 		return (1);
 
-	if (*sched == NULL) {
-		*sched = malloc(sizeof(struct aes_xts_ctx));
+	if (sched == NULL) {
+		sched = malloc(sizeof(struct aes_xts_ctx));
 	}
-	if (*sched == NULL)
+	if (sched == NULL)
 		return (1);
-	ctx = (struct aes_xts_ctx *)*sched;
+	ctx = (struct aes_xts_ctx *)sched;
 
 	rijndael_set_key(&ctx->key1, key, len * 4);
 	rijndael_set_key(&ctx->key2, key + (len / 2), len * 4);

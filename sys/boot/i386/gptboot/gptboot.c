@@ -567,7 +567,7 @@ parse(char *cmdstr, int *dskupdated)
 static int
 dskread(void *buf, daddr_t lba, unsigned nblk)
 {
-	int err, n;
+	int err;
 
 	err = drvread(&dsk, buf, lba + dsk.start, nblk);
 

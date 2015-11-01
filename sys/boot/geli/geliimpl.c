@@ -29,9 +29,10 @@
 __FBSDID("$FreeBSD: head/usr.sbin/fstyp/geli.c 285426 2015-07-12 19:16:19Z allanjude $");
 
 #include "geli.h"
-#include "geli_aes.h"
 
 #include "geli_hmac.c"
+
+#include "geli_aes.h"
 #include "geli_aes.c"
 
 #define ENABLE_AESXTS 1
@@ -84,7 +85,6 @@ geli_taste(int read_func(void *vdev, void *priv, off_t off, void *buf,
 	geli_e->dsk = malloc(sizeof(struct dsk));
 	memcpy(geli_e->dsk, dskp, sizeof(struct dsk));
 	geli_e->part_end = lastsector;
-	/* XXX fix this */
 	if (dskp->part == 255) {
 		geli_e->dsk->part = dskp->slice;
 	}
@@ -100,10 +100,13 @@ geli_taste(int read_func(void *vdev, void *priv, off_t off, void *buf,
 		geli_hmac_update(&ctx, passphrase, strlen(passphrase));
 		bzero(passphrase, sizeof(passphrase));
 	} else if (geli_e->md.md_iterations > 0) {
+		printf("Calculating GELI Decryption Key @ %lu iterations...\n",
+		    geli_e->md.md_iterations);
 		u_char dkey[G_ELI_USERKEYLEN];
 
 		pkcs5v2_genkey(dkey, sizeof(dkey), geli_e->md.md_salt,
-		    sizeof(geli_e->md.md_salt), passphrase, geli_e->md.md_iterations);
+		    sizeof(geli_e->md.md_salt), passphrase,
+		    geli_e->md.md_iterations);
 		bzero(passphrase, sizeof(passphrase));
 		geli_hmac_update(&ctx, dkey, sizeof(dkey));
 		bzero(dkey, sizeof(dkey));
@@ -112,7 +115,6 @@ geli_taste(int read_func(void *vdev, void *priv, off_t off, void *buf,
 	geli_hmac_final(&ctx, key, 0);
 
 	error = geli_mkey_decrypt(geli_e, key, mkey, &keynum);
-
 	if (error) {
 		printf("Failed to decrypt GELI master key: %d\n", error);
 		return (1);
@@ -133,9 +135,15 @@ geli_taste(int read_func(void *vdev, void *priv, off_t off, void *buf,
 	}
 
 	/* Initialize the per-sector IV */
-	SHA256_Init(&geli_e->ivctx);
-	SHA256_Update(&geli_e->ivctx, geli_e->ivkey,
-	    sizeof(geli_e->ivkey));
+	switch (md.md_ealgo) {
+	case CRYPTO_AES_XTS:
+		break;
+	default:
+		SHA256_Init(&geli_e->ivctx);
+		SHA256_Update(&geli_e->ivctx, geli_e->ivkey,
+		    sizeof(geli_e->ivkey));
+		break;
+	}
 
 	SLIST_INSERT_HEAD(&geli_head, geli_e, entries);
 	geli_count++;
@@ -211,10 +219,10 @@ geli_read(struct dsk *dskp, off_t offset, u_char *buf, size_t bytes)
 
 			if (error) {
 				bzero(key, sizeof(key));
+				printf("Failed to decrypt in geli_read()!");
 				return (1);
 			}
 		}
-
 		bzero(key, sizeof(key));
 		return (0);
 	}
@@ -229,10 +237,10 @@ geli_decrypt(u_int algo, u_char *data, size_t datasize,
 {
 	keyInstance aeskey;
 #ifdef ENABLE_AESXTS
-	struct aes_xts_ctx aesctx;
+	struct aes_xts_ctx xtsctx;
+	size_t xts_keysize;
 #endif
 	int err, blks;
-
 	switch (algo) {
 		case CRYPTO_AES_CBC:
 			err = rijndael_makeKey(&aeskey, DIR_DECRYPT, keysize,
@@ -250,13 +258,16 @@ geli_decrypt(u_int algo, u_char *data, size_t datasize,
 			break;
 		case CRYPTO_AES_XTS:
 #ifdef ENABLE_AESXTS
-			err = aes_xts_setkey(&aesctx, key, keysize / 8);
+			xts_keysize = keysize << 1;
+			err = aes_xts_setkey(&xtsctx, key, xts_keysize / 8);
 			if (err) {
-				printf("Failed to setup decryption keys\n");
+				printf("Failed to setup decryption keys1\n");
 				return (err);
 			}
-			aes_xts_reinit(&aesctx, iv);
-			aes_xts_decrypt_block(&aesctx, data, datasize);
+
+			aes_xts_reinit(&xtsctx, iv);
+
+			aes_xts_decrypt_block(&xtsctx, data, datasize);
 			break;
 #endif
 		default:
@@ -287,17 +298,17 @@ geli_ivgen(struct geli_entry *gep, off_t offset, u_char *iv,
 		bzero(iv + sizeof(off), size - sizeof(off));
 		break;
 	default:
-	    {
-		u_char hash[SHA256_DIGEST_LENGTH];
-		SHA256_CTX ctx;
+		{
+			u_char hash[SHA256_DIGEST_LENGTH];
+			SHA256_CTX ctx;
 
-		/* Copy precalculated SHA256 context for IV-Key. */
-		bcopy(&gep->ivctx, &ctx, sizeof(ctx));
-		SHA256_Update(&ctx, off, sizeof(off));
-		SHA256_Final(hash, &ctx);
-		bcopy(hash, iv, MIN(sizeof(hash), size));
-		break;
-	    }
+			/* Copy precalculated SHA256 context for IV-Key. */
+			bcopy(&gep->ivctx, &ctx, sizeof(ctx));
+			SHA256_Update(&ctx, off, sizeof(off));
+			SHA256_Final(hash, &ctx);
+			bcopy(hash, iv, MIN(sizeof(hash), size));
+			break;
+		}
 	}
 }
 
@@ -311,6 +322,10 @@ geli_key(struct geli_entry *gep, off_t offset, uint8_t *key)
 		uint8_t keyno[8];
 	} __packed hmacdata;
 
+	if ((gep->md.md_flags & G_ELI_FLAG_SINGLE_KEY) != 0) {
+		bcopy(gep->ekey, key, G_ELI_DATAKEYLEN);
+		return;
+	}
 	if ((gep->md.md_flags & G_ELI_FLAG_ENC_IVKEY) != 0) {
 		ekey = gep->mkey;
 	} else {
@@ -320,6 +335,7 @@ geli_key(struct geli_entry *gep, off_t offset, uint8_t *key)
 	keyno = (offset >> G_ELI_KEY_SHIFT) / DEV_BSIZE;
 	bcopy("ekey", hmacdata.magic, 4);
 	le64enc(hmacdata.keyno, keyno);
+
 	geli_hmac(ekey, G_ELI_MAXKEYLEN, (uint8_t *)&hmacdata,
 	    sizeof(hmacdata), key, 0);
 }

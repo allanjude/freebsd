@@ -29,8 +29,43 @@
 
 #include "geliboot.h"
 
+#include <crypto/intake.h>
+
 SLIST_HEAD(geli_list, geli_entry) geli_head = SLIST_HEAD_INITIALIZER(geli_head);
 struct geli_list *geli_headp;
+
+typedef u_char geli_mkey[G_ELI_DATAIVKEYLEN];
+
+static geli_mkey saved_keys[GELI_MAX_KEYS];
+static unsigned int nsaved_keys = 0;
+
+void
+geli_fill_keybuf(keybuf_t *keybuf)
+{
+        int i;
+
+        for(i = 0; i < nsaved_keys; i++) {
+                keybuf->kb_ents[i].ke_type = KEYBUF_TYPE_GELI;
+                memcpy(keybuf->kb_ents[i].ke_data, saved_keys[i],
+                    G_ELI_DATAIVKEYLEN);
+        }
+
+        keybuf->kb_nents = nsaved_keys;
+        memset(saved_keys, 0, sizeof saved_keys);
+}
+
+static void
+save_key(geli_mkey key)
+{
+
+        /* If we run out of key space, the worst that will happen is
+         * it will ask the user for the password again.
+         */
+        if (nsaved_keys < GELI_MAX_KEYS) {
+                memcpy(saved_keys[nsaved_keys], key, G_ELI_DATAIVKEYLEN);
+                nsaved_keys++;
+        }
+}
 
 static int
 geli_same_device(struct geli_entry *ge, struct dsk *dskp)
@@ -191,6 +226,7 @@ geli_attach(struct dsk *dskp, const char *passphrase)
 		}
 
 		/* Store the keys */
+                save_key(mkey);
 		bcopy(mkey, geli_e->sc.sc_mkey, sizeof(geli_e->sc.sc_mkey));
 		bcopy(mkey, geli_e->sc.sc_ivkey, sizeof(geli_e->sc.sc_ivkey));
 		mkp = mkey + sizeof(geli_e->sc.sc_ivkey);
@@ -231,7 +267,7 @@ is_geli(struct dsk *dskp)
 			return (0);
 		}
 	}
-	
+
 	return (1);
 }
 

@@ -63,6 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/eventhandler.h>
 #include <sys/kernel.h>
 #include <sys/kthread.h>
+#include <sys/linker.h>
 #include <sys/lock.h>
 #include <sys/module.h>
 #include <sys/mutex.h>
@@ -74,6 +75,7 @@ __FBSDID("$FreeBSD$");
 #include <ddb/ddb.h>
 
 #include <vm/uma.h>
+#include <crypto/intake.h>
 #include <opencrypto/cryptodev.h>
 #include <opencrypto/xform.h>			/* XXX for M_XDATA */
 
@@ -84,6 +86,7 @@ __FBSDID("$FreeBSD$");
 #if defined(__i386__) || defined(__amd64__) || defined(__aarch64__)
 #include <machine/pcb.h>
 #endif
+#include <machine/metadata.h>
 
 SDT_PROVIDER_DEFINE(opencrypto);
 
@@ -186,6 +189,36 @@ SYSCTL_INT(_debug, OID_AUTO, crypto_timing, CTLFLAG_RW,
 	   &crypto_timing, 0, "Enable/disable crypto timing support");
 #endif
 
+/* Try to avoid directly exposing the key buffer as a symbol */
+static keybuf_t *keybuf = NULL;
+
+static keybuf_t empty_keybuf = {
+        .kb_nents = 0
+};
+
+/* Obtain the key buffer from boot metadata */
+static void
+keybuf_init(void)
+{
+	caddr_t	kmdp;
+
+	kmdp = preload_search_by_type("elf kernel");
+
+	if (kmdp == NULL)
+		kmdp = preload_search_by_type("elf64 kernel");
+
+	keybuf = (keybuf_t *)preload_search_info(kmdp,
+	    MODINFO_METADATA | MODINFOMD_KEYBUF);
+
+        if (keybuf == NULL)
+                keybuf = &empty_keybuf;
+}
+
+/* It'd be nice if we could store these in some kind of secure memory... */
+keybuf_t* get_keybuf(void) {
+        return (keybuf);
+}
+
 static int
 crypto_init(void)
 {
@@ -238,6 +271,9 @@ crypto_init(void)
 			error);
 		goto bad;
 	}
+
+        keybuf_init();
+
 	return 0;
 bad:
 	crypto_destroy();

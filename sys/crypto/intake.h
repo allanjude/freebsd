@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003 Peter Wemm <peter@FreeBSD.org>
+ * Copyright (c) 2016 Eric McCorkle
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,18 +26,34 @@
  * $FreeBSD$
  */
 
-#ifndef _MACHINE_METADATA_H_
-#define	_MACHINE_METADATA_H_
+#ifndef _INTAKE_H_
+#define _INTAKE_H_
 
-#define	MODINFOMD_BOOTINFO	0x1001
-#define	MODINFOMD_DTBP		0x1002
-#define	MODINFOMD_EFI_MAP	0x1003
-#define MODINFOMD_KEYBUF        0x1004
+/* This file provides an interface for providing keys to the kernel
+ * during boot time.
+ */
 
-struct efi_map_header {
-	uint64_t	memory_size;
-	uint64_t	descriptor_size;
-	uint32_t	descriptor_version;
+#define MAX_KEY_BITS 4096
+#define MAX_KEY_BYTES (MAX_KEY_BITS / 8)
+
+enum {
+  KEYBUF_TYPE_NONE,
+  KEYBUF_TYPE_GELI
 };
 
-#endif /* !_MACHINE_METADATA_H_ */
+typedef struct keybuf_ent_t {
+        unsigned int ke_type;
+        char ke_data[MAX_KEY_BYTES];
+} keybuf_ent_t;
+
+typedef struct keybuf_t {
+        unsigned int kb_nents;
+        keybuf_ent_t kb_ents[];
+} keybuf_t;
+
+#ifdef _KERNEL
+/* Get the key intake buffer */
+extern keybuf_t* get_keybuf(void);
+#endif
+
+#endif

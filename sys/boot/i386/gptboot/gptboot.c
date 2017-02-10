@@ -101,7 +101,7 @@ static char *heap_end;
 
 void exit(int);
 static void load(void);
-static int parse(char *, int *);
+static int parse_cmds(char *, int *);
 static int dskread(void *, daddr_t, unsigned);
 void *malloc(size_t n);
 void free(void *ptr);
@@ -316,7 +316,7 @@ main(void)
 		}
 		if (*cmd != '\0') {
 			memcpy(cmdtmp, cmd, sizeof(cmdtmp));
-			if (parse(cmdtmp, &dskupdated))
+			if (parse_cmds(cmdtmp, &dskupdated))
 				break;
 			if (dskupdated && gptinit() != 0)
 				break;
@@ -366,7 +366,7 @@ main(void)
 			getstr(cmd, sizeof(cmd));
 		else if (!OPT_CHECK(RBX_QUIET))
 			putchar('\n');
-		if (parse(cmd, &dskupdated)) {
+		if (parse_cmds(cmd, &dskupdated)) {
 			putchar('\a');
 			continue;
 		}
@@ -489,7 +489,7 @@ load(void)
 }
 
 static int
-parse(char *cmdstr, int *dskupdated)
+parse_cmds(char *cmdstr, int *dskupdated)
 {
     char *arg = cmdstr;
     char *ep, *p, *q;

@@ -36,6 +36,7 @@
 #define	MODINFOMD_ITLB_SLOTS	0x1005
 #define	MODINFOMD_DTLB		0x1006
 #define	MODINFOMD_ITLB		0x1007
+#define MODINFOMD_KEYBUF        0x1008
 
 struct tlb_entry {
 	vm_offset_t te_pa;

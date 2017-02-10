@@ -121,7 +121,7 @@ static struct dmadat *dmadat;
 void exit(int);
 void reboot(void);
 static void load(void);
-static int parse(void);
+static int parse_cmd(void);
 static void bios_getmem(void);
 void *malloc(size_t n);
 void free(void *ptr);
@@ -398,7 +398,7 @@ bios_getmem(void)
 	v86.ctl = 0;
 	v86.addr = 0x12;		/* int 0x12 */
 	v86int();
-	
+
 	bios_basemem = (v86.eax & 0xffff) * 1024;
     }
 
@@ -442,7 +442,7 @@ int13probe(int drive)
     v86.eax = 0x800;
     v86.edx = drive;
     v86int();
-    
+
     if (!V86_CY(v86.efl) &&				/* carry clear */
 	((v86.edx & 0xff) != (drive & DRV_MASK))) {	/* unit # OK */
 	if ((v86.ecx & 0x3f) == 0) {			/* absurd sector size */
@@ -729,7 +729,7 @@ main(void)
 		 */
 		nextboot = 1;
 		memcpy(cmddup, cmd, sizeof(cmd));
-		if (parse()) {
+		if (parse_cmd()) {
 		    printf("failed to parse pad2 area of primary vdev\n");
 		    reboot();
 		}
@@ -756,11 +756,11 @@ main(void)
 
     if (*cmd) {
 	/*
-	 * Note that parse() is destructive to cmd[] and we also want
+	 * Note that parse_cmd() is destructive to cmd[] and we also want
 	 * to honor RBX_QUIET option that could be present in cmd[].
 	 */
 	memcpy(cmddup, cmd, sizeof(cmd));
-	if (parse())
+	if (parse_cmd())
 	    autoboot = 0;
 	if (!OPT_CHECK(RBX_QUIET))
 	    printf("%s: %s\n", PATH_CONFIG, cmddup);
@@ -810,7 +810,7 @@ main(void)
 	else if (!autoboot || !OPT_CHECK(RBX_QUIET))
 	    putchar('\n');
 	autoboot = 0;
-	if (parse())
+	if (parse_cmd())
 	    putchar('\a');
 	else
 	    load();
@@ -979,7 +979,7 @@ zfs_mount_ds(char *dsname)
 }
 
 static int
-parse(void)
+parse_cmd(void)
 {
     char *arg = cmd;
     char *ep, *p, *q;

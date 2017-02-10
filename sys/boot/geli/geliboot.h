@@ -27,8 +27,10 @@
  * $FreeBSD$
  */
 
+#include <crypto/intake.h>
 #include <sys/endian.h>
 #include <sys/queue.h>
+#include <bootstrap.h>
 
 #ifndef _GELIBOOT_H_
 #define _GELIBOOT_H_
@@ -64,6 +66,7 @@
 #define    MIN(a,b) (((a) < (b)) ? (a) : (b))
 #endif
 
+#define GELI_MAX_KEYS 64
 #define GELI_PW_MAXLEN			256
 extern void pwgets(char *buf, int n);
 
@@ -89,5 +92,7 @@ int geli_passphrase(char *pw, int disk, int parttype, int part, struct dsk *dskp
 
 int geliboot_crypt(u_int algo, int enc, u_char *data, size_t datasize,
     const u_char *key, size_t keysize, u_char *iv);
+
+void geli_fill_keybuf(keybuf_t *keybuf);
 
 #endif /* _GELIBOOT_H_ */

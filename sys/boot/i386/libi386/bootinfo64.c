@@ -40,6 +40,13 @@ __FBSDID("$FreeBSD$");
 #include "libi386.h"
 #include "btxv86.h"
 
+#ifdef LOADER_GELI_SUPPORT
+#include "geliboot.h"
+
+static const size_t keybuf_size = sizeof(keybuf_t) +
+    (GELI_MAX_KEYS * sizeof(keybuf_ent_t));
+#endif
+
 /*
  * Copy module-related data into the load area, where it can be
  * used as a directory for loaded modules.
@@ -189,6 +196,10 @@ bi_load64(char *args, vm_offset_t addr, vm_offset_t *modulep,
     vm_offset_t			size;
     char			*rootdevname;
     int				howto;
+#ifdef LOADER_GELI_SUPPORT
+    char                        buf[keybuf_size];
+    keybuf_t                    *keybuf = (keybuf_t *)buf;
+#endif
 
     if (!bi_checkcpu()) {
 	printf("CPU doesn't support long mode\n");
@@ -197,8 +208,8 @@ bi_load64(char *args, vm_offset_t addr, vm_offset_t *modulep,
 
     howto = bi_getboothowto(args);
 
-    /* 
-     * Allow the environment variable 'rootdev' to override the supplied device 
+    /*
+     * Allow the environment variable 'rootdev' to override the supplied device
      * This should perhaps go to MI code and/or have $rootdev tested/set by
      * MI code before launching the kernel.
      */
@@ -237,6 +248,12 @@ bi_load64(char *args, vm_offset_t addr, vm_offset_t *modulep,
     file_addmetadata(kfp, MODINFOMD_MODULEP, sizeof module, &module);
     if (add_smap != 0)
         bios_addsmapdata(kfp);
+
+#ifdef LOADER_GELI_SUPPORT
+    geli_fill_keybuf(keybuf);
+    file_addmetadata(kfp, MODINFOMD_KEYBUF, keybuf_size, buf);
+    memset(buf, 0, sizeof buf);
+#endif
 
     size = bi_copymodules64(0);
 

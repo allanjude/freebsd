@@ -252,7 +252,7 @@ bi_load64(char *args, vm_offset_t addr, vm_offset_t *modulep,
 #ifdef LOADER_GELI_SUPPORT
     geli_fill_keybuf(keybuf);
     file_addmetadata(kfp, MODINFOMD_KEYBUF, keybuf_size, buf);
-    memset(buf, 0, sizeof buf);
+    bzero(buf, sizeof(buf));
 #endif
 
     size = bi_copymodules64(0);

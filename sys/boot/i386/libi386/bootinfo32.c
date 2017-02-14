@@ -236,7 +236,7 @@ bi_load32(char *args, int *howtop, int *bootdevp, vm_offset_t *bip, vm_offset_t 
 #ifdef LOADER_GELI_SUPPORT
     geli_fill_keybuf(keybuf);
     file_addmetadata(kfp, MODINFOMD_KEYBUF, keybuf_size, buf);
-    memset(buf, 0, sizeof buf);
+    bzero(buf, sizeof(buf));
 #endif
 
     /* Figure out the size and location of the metadata */

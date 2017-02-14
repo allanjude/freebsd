@@ -1040,7 +1040,7 @@ g_eli_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 	}
 
         if ((keybuf = get_keybuf()) != NULL) {
-                /* Scan the key buffer, try all GELI keys  */
+                /* Scan the key buffer, try all GELI keys. */
                 for (i = 0; i < keybuf->kb_nents; i++) {
                          if (keybuf->kb_ents[i].ke_type == KEYBUF_TYPE_GELI) {
                                  memcpy(key, keybuf->kb_ents[i].ke_data,
@@ -1081,7 +1081,9 @@ g_eli_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
                         /* Ask for the passphrase if defined. */
                         if (md.md_iterations >= 0) {
                                 /* Try first with cached passphrase. */
-                                if (i == 0 && !g_eli_boot_passcache) {
+                                if (i == 0) {
+                                        if (!g_eli_boot_passcache)
+                                                continue;
                                         memcpy(passphrase, cached_passphrase,
                                             sizeof(passphrase));
                                 } else {

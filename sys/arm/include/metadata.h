@@ -32,7 +32,6 @@
 #define	MODINFOMD_BOOTINFO	0x1001
 #define	MODINFOMD_DTBP		0x1002
 #define	MODINFOMD_EFI_MAP	0x1003
-#define	MODINFOMD_KEYBUF	0x1004
 
 struct efi_map_header {
 	uint64_t	memory_size;

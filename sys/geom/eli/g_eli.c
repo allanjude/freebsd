@@ -127,7 +127,7 @@ zero_geli_intake_keys(void *dummy)
         int i;
 
         if ((keybuf = get_keybuf()) != NULL) {
-                /* Scan the key buffer, try all GELI keys. */
+                /* Scan the key buffer, clear all GELI keys. */
                 for (i = 0; i < keybuf->kb_nents; i++) {
                          if (keybuf->kb_ents[i].ke_type == KEYBUF_TYPE_GELI) {
                                  explicit_bzero(keybuf->kb_ents[i].ke_data,

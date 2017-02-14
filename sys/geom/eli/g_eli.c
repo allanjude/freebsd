@@ -116,10 +116,28 @@ SYSINIT(geli_fetch_loader_passphrase, SI_SUB_KMEM + 1, SI_ORDER_ANY,
 static void
 zero_boot_passcache(void * dummy)
 {
-
-	memset(cached_passphrase, 0, sizeof(cached_passphrase));
+	explicit_bzero(cached_passphrase, sizeof(cached_passphrase));
 }
 EVENTHANDLER_DEFINE(mountroot, zero_boot_passcache, NULL, 0);
+
+static void
+zero_geli_intake_keys(void *dummy)
+{
+        keybuf_t *keybuf;
+        int i;
+
+        if ((keybuf = get_keybuf()) != NULL) {
+                /* Scan the key buffer, try all GELI keys. */
+                for (i = 0; i < keybuf->kb_nents; i++) {
+                         if (keybuf->kb_ents[i].ke_type == KEYBUF_TYPE_GELI) {
+                                 explicit_bzero(keybuf->kb_ents[i].ke_data,
+                                     sizeof(key));
+                                 keybuf->kb_ents[i].ke_type = KEYBUF_TYPE_NONE;
+                         }
+                }
+        }
+}
+EVENTHANDLER_DEFINE(mountroot, zero_geli_intake_keys, NULL, 0);
 
 static eventhandler_tag g_eli_pre_sync = NULL;
 
@@ -1044,7 +1062,7 @@ g_eli_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
                 for (i = 0; i < keybuf->kb_nents; i++) {
                          if (keybuf->kb_ents[i].ke_type == KEYBUF_TYPE_GELI) {
                                  memcpy(key, keybuf->kb_ents[i].ke_data,
-                                     sizeof key);
+                                     sizeof(key));
 
                                  if (g_eli_mkey_decrypt(&md, key,
                                      mkey, &nkey) == 0 ) {

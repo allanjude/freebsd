@@ -66,7 +66,7 @@
 #define    MIN(a,b) (((a) < (b)) ? (a) : (b))
 #endif
 
-#define GELI_MAX_KEYS 64
+#define	GELI_MAX_KEYS			64
 #define GELI_PW_MAXLEN			256
 extern void pwgets(char *buf, int n);
 

@@ -29,7 +29,8 @@
 #ifndef _INTAKE_H_
 #define _INTAKE_H_
 
-/* This file provides an interface for providing keys to the kernel
+/*
+ * This file provides an interface for providing keys to the kernel
  * during boot time.
  */
 

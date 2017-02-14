@@ -51,14 +51,15 @@ geli_fill_keybuf(keybuf_t *keybuf)
         }
 
         keybuf->kb_nents = nsaved_keys;
-        memset(saved_keys, 0, sizeof saved_keys);
+        bzero(saved_keys, sizeof(saved_keys));
 }
 
 static void
 save_key(geli_mkey key)
 {
 
-        /* If we run out of key space, the worst that will happen is
+        /*
+         * If we run out of key space, the worst that will happen is
          * it will ask the user for the password again.
          */
         if (nsaved_keys < GELI_MAX_KEYS) {

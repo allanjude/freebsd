@@ -1044,16 +1044,17 @@ g_eli_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
                 for (i = 0; i < keybuf->kb_nents; i++) {
                          if (keybuf->kb_ents[i].ke_type == KEYBUF_TYPE_GELI) {
                                  memcpy(key, keybuf->kb_ents[i].ke_data,
-                                        sizeof key);
+                                     sizeof key);
 
                                  if (g_eli_mkey_decrypt(&md, key,
-                                                        mkey, &nkey) == 0 ) {
+                                     mkey, &nkey) == 0 ) {
                                          found_intake = true;
+                                         break;
                                  }
                          }
                 }
         }
-
+        explicit_bzero(key, sizeof(key));
         if (!found_intake) {
                 for (i = 0; i <= tries; i++) {
                         g_eli_crypto_hmac_init(&ctx, NULL, 0);
@@ -1080,9 +1081,7 @@ g_eli_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
                         /* Ask for the passphrase if defined. */
                         if (md.md_iterations >= 0) {
                                 /* Try first with cached passphrase. */
-                                if (i == 0) {
-                                        if (!g_eli_boot_passcache)
-                                                continue;
+                                if (i == 0 && !g_eli_boot_passcache) {
                                         memcpy(passphrase, cached_passphrase,
                                             sizeof(passphrase));
                                 } else {
@@ -1102,7 +1101,7 @@ g_eli_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
                                     sizeof(md.md_salt));
                                 g_eli_crypto_hmac_update(&ctx, passphrase,
                                     strlen(passphrase));
-                                bzero(passphrase, sizeof(passphrase));
+                                explicit_bzero(passphrase, sizeof(passphrase));
                         } else if (md.md_iterations > 0) {
                                 u_char dkey[G_ELI_USERKEYLEN];
 
@@ -1110,7 +1109,7 @@ g_eli_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
                                     sizeof(md.md_salt), passphrase, md.md_iterations);
                                 bzero(passphrase, sizeof(passphrase));
                                 g_eli_crypto_hmac_update(&ctx, dkey, sizeof(dkey));
-                                bzero(dkey, sizeof(dkey));
+                                explicit_bzero(dkey, sizeof(dkey));
                         }
 
                         g_eli_crypto_hmac_final(&ctx, key, 0);

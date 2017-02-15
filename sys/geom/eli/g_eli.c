@@ -114,9 +114,10 @@ fetch_loader_passphrase(void * dummy)
 SYSINIT(geli_fetch_loader_passphrase, SI_SUB_KMEM + 1, SI_ORDER_ANY,
     fetch_loader_passphrase, NULL);
 static void
-zero_boot_passcache(void * dummy)
+zero_boot_passcache(void *dummy)
 {
-	explicit_bzero(cached_passphrase, sizeof(cached_passphrase));
+
+        explicit_bzero(cached_passphrase, sizeof(cached_passphrase));
 }
 EVENTHANDLER_DEFINE(mountroot, zero_boot_passcache, NULL, 0);
 
@@ -1017,9 +1018,10 @@ g_eli_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 	u_char key[G_ELI_USERKEYLEN], mkey[G_ELI_DATAIVKEYLEN];
 	u_int i, nkey, nkeyfiles, tries;
 	int error;
-        bool found_intake = false;
+        bool found_intake;
         keybuf_t *keybuf;
 
+        found_intake = false;
 	g_trace(G_T_TOPOLOGY, "%s(%s, %s)", __func__, mp->name, pp->name);
 	g_topology_assert();
 

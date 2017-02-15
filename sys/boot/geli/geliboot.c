@@ -27,9 +27,9 @@
  * $FreeBSD$
  */
 
-#include "geliboot.h"
-
 #include <crypto/intake.h>
+
+#include "geliboot.h"
 
 SLIST_HEAD(geli_list, geli_entry) geli_head = SLIST_HEAD_INITIALIZER(geli_head);
 struct geli_list *geli_headp;
@@ -44,7 +44,7 @@ geli_fill_keybuf(keybuf_t *keybuf)
 {
         int i;
 
-        for(i = 0; i < nsaved_keys; i++) {
+        for (i = 0; i < nsaved_keys; i++) {
                 keybuf->kb_ents[i].ke_type = KEYBUF_TYPE_GELI;
                 memcpy(keybuf->kb_ents[i].ke_data, saved_keys[i],
                     G_ELI_DATAIVKEYLEN);

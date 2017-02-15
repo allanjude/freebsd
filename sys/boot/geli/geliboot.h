@@ -28,8 +28,10 @@
  */
 
 #include <crypto/intake.h>
+
 #include <sys/endian.h>
 #include <sys/queue.h>
+
 #include <bootstrap.h>
 
 #ifndef _GELIBOOT_H_

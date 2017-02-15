@@ -190,7 +190,7 @@ SYSCTL_INT(_debug, OID_AUTO, crypto_timing, CTLFLAG_RW,
 #endif
 
 /* Try to avoid directly exposing the key buffer as a symbol */
-static keybuf_t *keybuf = NULL;
+static keybuf_t *keybuf;
 
 static keybuf_t empty_keybuf = {
         .kb_nents = 0
@@ -200,7 +200,7 @@ static keybuf_t empty_keybuf = {
 static void
 keybuf_init(void)
 {
-	caddr_t	kmdp;
+	caddr_t kmdp;
 
 	kmdp = preload_search_by_type("elf kernel");
 
@@ -216,6 +216,7 @@ keybuf_init(void)
 
 /* It'd be nice if we could store these in some kind of secure memory... */
 keybuf_t* get_keybuf(void) {
+
         return (keybuf);
 }
 
@@ -318,7 +319,7 @@ crypto_destroy(void)
 
 	/* XXX flush queues??? */
 
-	/* 
+	/*
 	 * Reclaim dynamically allocated resources.
 	 */
 	if (crypto_drivers != NULL)

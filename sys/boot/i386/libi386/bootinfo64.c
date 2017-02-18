@@ -43,8 +43,8 @@ __FBSDID("$FreeBSD$");
 #ifdef LOADER_GELI_SUPPORT
 #include "geliboot.h"
 
-static const size_t keybuf_size = sizeof(keybuf_t) +
-    (GELI_MAX_KEYS * sizeof(keybuf_ent_t));
+static const size_t keybuf_size = sizeof(struct keybuf) +
+    (GELI_MAX_KEYS * sizeof(struct keybuf_ent));
 #endif
 
 /*
@@ -198,7 +198,7 @@ bi_load64(char *args, vm_offset_t addr, vm_offset_t *modulep,
     int				howto;
 #ifdef LOADER_GELI_SUPPORT
     char                        buf[keybuf_size];
-    keybuf_t                    *keybuf = (keybuf_t *)buf;
+    struct keybuf               *keybuf = (struct keybuf *)buf;
 #endif
 
     if (!bi_checkcpu()) {

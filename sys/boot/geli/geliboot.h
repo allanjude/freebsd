@@ -27,10 +27,10 @@
  * $FreeBSD$
  */
 
-#include <crypto/intake.h>
-
 #include <sys/endian.h>
 #include <sys/queue.h>
+
+#include <crypto/intake.h>
 
 #include <bootstrap.h>
 
@@ -95,6 +95,6 @@ int geli_passphrase(char *pw, int disk, int parttype, int part, struct dsk *dskp
 int geliboot_crypt(u_int algo, int enc, u_char *data, size_t datasize,
     const u_char *key, size_t keysize, u_char *iv);
 
-void geli_fill_keybuf(keybuf_t *keybuf);
+void geli_fill_keybuf(struct keybuf *keybuf);
 
 #endif /* _GELIBOOT_H_ */

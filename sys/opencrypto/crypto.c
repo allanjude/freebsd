@@ -190,9 +190,9 @@ SYSCTL_INT(_debug, OID_AUTO, crypto_timing, CTLFLAG_RW,
 #endif
 
 /* Try to avoid directly exposing the key buffer as a symbol */
-static keybuf_t *keybuf;
+static struct keybuf *keybuf;
 
-static keybuf_t empty_keybuf = {
+static struct keybuf empty_keybuf = {
         .kb_nents = 0
 };
 
@@ -207,7 +207,7 @@ keybuf_init(void)
 	if (kmdp == NULL)
 		kmdp = preload_search_by_type("elf64 kernel");
 
-	keybuf = (keybuf_t *)preload_search_info(kmdp,
+	keybuf = (struct keybuf *)preload_search_info(kmdp,
 	    MODINFO_METADATA | MODINFOMD_KEYBUF);
 
         if (keybuf == NULL)
@@ -215,7 +215,7 @@ keybuf_init(void)
 }
 
 /* It'd be nice if we could store these in some kind of secure memory... */
-keybuf_t* get_keybuf(void) {
+struct keybuf * get_keybuf(void) {
 
         return (keybuf);
 }

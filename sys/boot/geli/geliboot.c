@@ -40,9 +40,9 @@ static geli_mkey saved_keys[GELI_MAX_KEYS];
 static unsigned int nsaved_keys = 0;
 
 void
-geli_fill_keybuf(keybuf_t *keybuf)
+geli_fill_keybuf(struct keybuf *keybuf)
 {
-        int i;
+        unsigned int i;
 
         for (i = 0; i < nsaved_keys; i++) {
                 keybuf->kb_ents[i].ke_type = KEYBUF_TYPE_GELI;

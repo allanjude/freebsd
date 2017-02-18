@@ -29,32 +29,34 @@
 #ifndef _INTAKE_H_
 #define _INTAKE_H_
 
+#include  <sys/param.h>
+
 /*
  * This file provides an interface for providing keys to the kernel
  * during boot time.
  */
 
 #define MAX_KEY_BITS	4096
-#define	MAX_KEY_BYTES	(MAX_KEY_BITS / 8)
+#define	MAX_KEY_BYTES	(MAX_KEY_BITS / NBBY)
 
 enum {
         KEYBUF_TYPE_NONE,
         KEYBUF_TYPE_GELI
 };
 
-typedef struct keybuf_ent_t {
+struct keybuf_ent {
         unsigned int ke_type;
         char ke_data[MAX_KEY_BYTES];
-} keybuf_ent_t;
+};
 
-typedef struct keybuf_t {
+struct keybuf {
         unsigned int kb_nents;
-        keybuf_ent_t kb_ents[];
-} keybuf_t;
+        struct keybuf_ent kb_ents[];
+};
 
 #ifdef _KERNEL
 /* Get the key intake buffer */
-extern keybuf_t* get_keybuf(void);
+extern struct keybuf* get_keybuf(void);
 #endif
 
 #endif

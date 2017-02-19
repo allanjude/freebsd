@@ -224,10 +224,12 @@ geli_attach(struct dsk *dskp, const char *passphrase)
 			explicit_bzero(mkey, sizeof(mkey));
 			printf("Failed to decrypt GELI master key: %d\n", error);
 			return (error);
-		}
+		} else {
+                        /* Store the keys */
+                        save_key(key);
+                        bzero(&key, sizeof(key));
+                }
 
-		/* Store the keys */
-                save_key(key);
 		bcopy(mkey, geli_e->sc.sc_mkey, sizeof(geli_e->sc.sc_mkey));
 		bcopy(mkey, geli_e->sc.sc_ivkey, sizeof(geli_e->sc.sc_ivkey));
 		mkp = mkey + sizeof(geli_e->sc.sc_ivkey);

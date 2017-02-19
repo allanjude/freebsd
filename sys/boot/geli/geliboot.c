@@ -227,7 +227,7 @@ geli_attach(struct dsk *dskp, const char *passphrase)
 		}
 
 		/* Store the keys */
-                save_key(mkey);
+                save_key(key);
 		bcopy(mkey, geli_e->sc.sc_mkey, sizeof(geli_e->sc.sc_mkey));
 		bcopy(mkey, geli_e->sc.sc_ivkey, sizeof(geli_e->sc.sc_ivkey));
 		mkp = mkey + sizeof(geli_e->sc.sc_ivkey);

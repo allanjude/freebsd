@@ -13,7 +13,7 @@
 
 FAT_SIZE=1600 			#Size in 512-byte blocks of the produced image
 
-BOOT1_SIZE=128k
+BOOT1_SIZE=512k
 
 #
 # Known filenames

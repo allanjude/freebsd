@@ -215,19 +215,22 @@ geli_attach(struct dsk *dskp, const char *passphrase)
 		g_eli_crypto_hmac_final(&ctx, key, 0);
 
 		error = g_eli_mkey_decrypt(&geli_e->md, key, mkey, &keynum);
-		bzero(&key, sizeof(key));
 		if (error == -1) {
 			bzero(&mkey, sizeof(mkey));
+                        bzero(&key, sizeof(key));
 			printf("Bad GELI key: %d\n", error);
 			return (error);
 		} else if (error != 0) {
 			bzero(&mkey, sizeof(mkey));
-			printf("Failed to decrypt GELI master key: %d\n", error);
+                        bzero(&key, sizeof(key));
+                        printf("Failed to decrypt GELI master key: %d\n", error);
 			return (error);
-		}
+		} else {
+                        /* Store the keys */
+                        save_key(key);
+                        bzero(&key, sizeof(key));
+                }
 
-		/* Store the keys */
-                save_key(key);
 		bcopy(mkey, geli_e->sc.sc_mkey, sizeof(geli_e->sc.sc_mkey));
 		bcopy(mkey, geli_e->sc.sc_ivkey, sizeof(geli_e->sc.sc_ivkey));
 		mkp = mkey + sizeof(geli_e->sc.sc_ivkey);

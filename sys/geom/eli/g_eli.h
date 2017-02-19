@@ -140,7 +140,7 @@
 #define	G_ELI_CRYPTO_SW		2
 
 #ifdef _KERNEL
-#if (MAX_KEY_BYTES < G_ELI_DATAKEYLEN)
+#if (MAX_KEY_BYTES < G_ELI_DATAIVKEYLEN)
 #error "MAX_KEY_BYTES is less than G_ELI_DATAKEYLEN"
 #endif
 

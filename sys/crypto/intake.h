@@ -39,6 +39,8 @@
 #define MAX_KEY_BITS	4096
 #define	MAX_KEY_BYTES	(MAX_KEY_BITS / NBBY)
 
+#define KEYBUF_SENTINEL	0xcee54b5d	/* KEYS4BSD */
+
 enum {
         KEYBUF_TYPE_NONE,
         KEYBUF_TYPE_GELI

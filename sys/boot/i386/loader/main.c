@@ -175,13 +175,12 @@ main(void)
     if ((kargs->bootflags & KARGS_FLAGS_EXTARG) != 0) {
 	zargs = (struct zfs_boot_args *)(kargs + 1);
 	if (zargs != NULL && zargs->size >= offsetof(struct zfs_boot_args, gelipw)) {
+	    if (zargs->keybuf_sentinel == KEYBUF_SENTINEL) {
+		geli_save_keybuf(zargs->keybuf);
+	    }
 	    if (zargs->gelipw[0] != '\0') {
 		setenv("kern.geom.eli.passphrase", zargs->gelipw, 1);
 		explicit_bzero(zargs->gelipw, sizeof(zargs->gelipw));
-	    }
-	    if (zargs->keybuf_sentinel == KEYBUF_SENTINEL) {
-printf("LOADER: found keybuf sentinel\n");
-		geli_save_keybuf(zargs->keybuf);
 	    }
 	}
     }
@@ -191,12 +190,12 @@ printf("LOADER: found keybuf sentinel\n");
     if ((kargs->bootflags & KARGS_FLAGS_EXTARG) != 0) {
 	gargs = (struct geli_boot_args *)(kargs + 1);
 	if (gargs != NULL && gargs->size >= offsetof(struct geli_boot_args, gelipw)) {
+	    if (gargs->keybuf_sentinel == KEYBUF_SENTINEL) {
+		geli_save_keybuf(gargs->keybuf);
+	    }
 	    if (gargs->gelipw[0] != '\0') {
 		setenv("kern.geom.eli.passphrase", gargs->gelipw, 1);
 		explicit_bzero(gargs->gelipw, sizeof(gargs->gelipw));
-	    }
-	    if (gargs->keybuf_sentinel == KEYBUF_SENTINEL) {
-		geli_save_keybuf(gargs->keybuf);
 	    }
 	}
     }

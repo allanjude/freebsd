@@ -39,6 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpufunc.h>
 #include <machine/psl.h>
 #include <sys/reboot.h>
+#include <common/drv.h>
 
 #include "bootstrap.h"
 #include "common/bootargs.h"
@@ -69,6 +70,7 @@ static int		isa_inb(int port);
 static void		isa_outb(int port, int value);
 void			exit(int code);
 #ifdef LOADER_GELI_SUPPORT
+#include "geliboot.h"
 struct geli_boot_args	*gargs;
 #endif
 #ifdef LOADER_ZFS_SUPPORT
@@ -177,6 +179,10 @@ main(void)
 		setenv("kern.geom.eli.passphrase", zargs->gelipw, 1);
 		explicit_bzero(zargs->gelipw, sizeof(zargs->gelipw));
 	    }
+	    if (zargs->keybuf_sentinel == KEYBUF_SENTINEL) {
+printf("LOADER: found keybuf sentinel\n");
+		geli_save_keybuf(zargs->keybuf);
+	    }
 	}
     }
 #endif /* LOADER_GELI_SUPPORT */
@@ -188,6 +194,9 @@ main(void)
 	    if (gargs->gelipw[0] != '\0') {
 		setenv("kern.geom.eli.passphrase", gargs->gelipw, 1);
 		explicit_bzero(gargs->gelipw, sizeof(gargs->gelipw));
+	    }
+	    if (gargs->keybuf_sentinel == KEYBUF_SENTINEL) {
+		geli_save_keybuf(gargs->keybuf);
 	    }
 	}
     }

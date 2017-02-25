@@ -27,53 +27,75 @@
  * $FreeBSD$
  */
 
-#include <crypto/intake.h>
-
+#include "geliboot_internal.h"
 #include "geliboot.h"
 
 SLIST_HEAD(geli_list, geli_entry) geli_head = SLIST_HEAD_INITIALIZER(geli_head);
 struct geli_list *geli_headp;
 
-typedef u_char geli_mkey[G_ELI_DATAIVKEYLEN];
+typedef u_char geli_ukey[G_ELI_USERKEYLEN];
 
-static geli_mkey saved_keys[GELI_MAX_KEYS];
+static geli_ukey saved_keys[GELI_MAX_KEYS];
 static unsigned int nsaved_keys = 0;
 
+/*
+ * Copy keys from local storage to the keybuf struct.
+ * Destroy the local storage when finished.
+ */
 void
-geli_fill_keybuf(struct keybuf *keybuf)
+geli_fill_keybuf(struct keybuf *fkeybuf)
 {
-        unsigned int i;
+	unsigned int i;
 
-        for (i = 0; i < nsaved_keys; i++) {
-                keybuf->kb_ents[i].ke_type = KEYBUF_TYPE_GELI;
-                memcpy(keybuf->kb_ents[i].ke_data, saved_keys[i],
-                    G_ELI_DATAIVKEYLEN);
-        }
+	for (i = 0; i < nsaved_keys; i++) {
+		fkeybuf->kb_ents[i].ke_type = KEYBUF_TYPE_GELI;
+		memcpy(fkeybuf->kb_ents[i].ke_data, saved_keys[i],
+		    G_ELI_USERKEYLEN);
+	}
+	fkeybuf->kb_nents = nsaved_keys;
+	bzero(saved_keys, sizeof(saved_keys));
+}
 
-        keybuf->kb_nents = nsaved_keys;
-        bzero(saved_keys, sizeof(saved_keys));
+/*
+ * Copy keys from a keybuf struct into local storage.
+ * Zero out the keybuf.
+ */
+void
+geli_save_keybuf(struct keybuf *skeybuf)
+{
+	unsigned int i;
+
+	for (i = 0; i < skeybuf->kb_nents && i < GELI_MAX_KEYS; i++) {
+		memcpy(saved_keys[i], skeybuf->kb_ents[i].ke_data,
+		    G_ELI_USERKEYLEN);
+		bzero(skeybuf->kb_ents[i].ke_data,
+		    G_ELI_USERKEYLEN);
+		skeybuf->kb_ents[i].ke_type = KEYBUF_TYPE_NONE;
+	}
+	nsaved_keys = skeybuf->kb_nents;
+	skeybuf->kb_nents = 0;
 }
 
 static void
-save_key(geli_mkey key)
+save_key(geli_ukey key)
 {
 
-        /*
-         * If we run out of key space, the worst that will happen is
-         * it will ask the user for the password again.
-         */
-        if (nsaved_keys < GELI_MAX_KEYS) {
-                memcpy(saved_keys[nsaved_keys], key, G_ELI_DATAIVKEYLEN);
-                nsaved_keys++;
-        }
+	/*
+	 * If we run out of key space, the worst that will happen is
+	 * it will ask the user for the password again.
+	 */
+	if (nsaved_keys < GELI_MAX_KEYS) {
+		memcpy(saved_keys[nsaved_keys], key, G_ELI_USERKEYLEN);
+		nsaved_keys++;
+	}
 }
 
 static int
 geli_same_device(struct geli_entry *ge, struct dsk *dskp)
 {
 
-	if (geli_e->dsk->drive == dskp->drive &&
-	    dskp->part == 255 && geli_e->dsk->part == dskp->slice) {
+	if (ge->dsk->drive == dskp->drive &&
+	    dskp->part == 255 && ge->dsk->part == dskp->slice) {
 		/*
 		 * Sometimes slice = slice, and sometimes part = slice
 		 * If the incoming struct dsk has part=255, it means look at
@@ -83,13 +105,37 @@ geli_same_device(struct geli_entry *ge, struct dsk *dskp)
 	}
 
 	/* Is this the same device? */
-	if (geli_e->dsk->drive != dskp->drive ||
-	    geli_e->dsk->slice != dskp->slice ||
-	    geli_e->dsk->part != dskp->part) {
+	if (ge->dsk->drive != dskp->drive ||
+	    ge->dsk->slice != dskp->slice ||
+	    ge->dsk->part != dskp->part) {
 		return (1);
 	}
 
 	return (0);
+}
+
+static int
+geli_findkey(struct geli_entry *ge, struct dsk *dskp, u_char *mkey)
+{
+	u_int keynum;
+	int i;
+
+	if (ge->keybuf_slot >= 0) {
+		if (g_eli_mkey_decrypt(&ge->md, saved_keys[ge->keybuf_slot],
+		    mkey, &keynum) == 0) {
+			return (0);
+		}
+	}
+
+	for (i = 0; i < nsaved_keys; i++) {
+		if (g_eli_mkey_decrypt(&ge->md, saved_keys[i], mkey,
+		    &keynum) == 0) {
+			ge->keybuf_slot = i;
+			return (0);
+		}
+	}
+
+	return (1);
 }
 
 void
@@ -159,6 +205,7 @@ geli_taste(int read_func(void *vdev, void *priv, off_t off, void *buf,
 	if (dskp->part == 255) {
 		geli_e->dsk->part = dskp->slice;
 	}
+	geli_e->keybuf_slot = -1;
 
 	geli_e->md = md;
 	eli_metadata_softc(&geli_e->sc, &md, DEV_BSIZE,
@@ -184,6 +231,10 @@ geli_attach(struct dsk *dskp, const char *passphrase)
 	SLIST_FOREACH_SAFE(geli_e, &geli_head, entries, geli_e_tmp) {
 		if (geli_same_device(geli_e, dskp) != 0) {
 			continue;
+		}
+
+		if (geli_findkey(geli_e, dskp, mkey) == 0) {
+			goto found_key;
 		}
 
 		g_eli_crypto_hmac_init(&ctx, NULL, 0);
@@ -218,18 +269,20 @@ geli_attach(struct dsk *dskp, const char *passphrase)
 		explicit_bzero(key, sizeof(key));
 		if (error == -1) {
 			explicit_bzero(mkey, sizeof(mkey));
-			printf("Bad GELI key: %d\n", error);
+			printf("Bad GELI key: bad password?\n");
 			return (error);
 		} else if (error != 0) {
 			explicit_bzero(mkey, sizeof(mkey));
-			printf("Failed to decrypt GELI master key: %d\n", error);
+                        printf("Failed to decrypt GELI master key: %d\n", error);
 			return (error);
 		} else {
-                        /* Store the keys */
+                        /* Add key to keychain */
                         save_key(key);
                         bzero(&key, sizeof(key));
                 }
 
+found_key:
+		/* Store the keys */
 		bcopy(mkey, geli_e->sc.sc_mkey, sizeof(geli_e->sc.sc_mkey));
 		bcopy(mkey, geli_e->sc.sc_ivkey, sizeof(geli_e->sc.sc_ivkey));
 		mkp = mkey + sizeof(geli_e->sc.sc_ivkey);
@@ -329,6 +382,28 @@ geli_read(struct dsk *dskp, off_t offset, u_char *buf, size_t bytes)
 	}
 
 	printf("GELI provider not found\n");
+	return (1);
+}
+
+int
+geli_havekey(struct dsk *dskp)
+{
+	u_char mkey[G_ELI_DATAIVKEYLEN];
+
+	SLIST_FOREACH_SAFE(geli_e, &geli_head, entries, geli_e_tmp) {
+		if (geli_same_device(geli_e, dskp) != 0) {
+			continue;
+		}
+
+		if (geli_findkey(geli_e, dskp, mkey) == 0) {
+			bzero(mkey, sizeof(mkey));
+			if (geli_attach(dskp, NULL) == 0) {
+				return (0);
+			}
+		}
+	}
+	bzero(mkey, sizeof(mkey));
+
 	return (1);
 }
 

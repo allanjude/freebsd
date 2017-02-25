@@ -139,6 +139,7 @@ free(void *ptr)
 #ifdef LOADER_GELI_SUPPORT
 #include "geliboot.c"
 static char gelipw[GELI_PW_MAXLEN];
+static struct keybuf *gelibuf;
 #endif
 
 static inline int
@@ -253,7 +254,8 @@ gptinit(void)
 #ifdef LOADER_GELI_SUPPORT
 	if (geli_taste(vdev_read, &dsk, (gpttable[curent].ent_lba_end -
 	    gpttable[curent].ent_lba_start)) == 0) {
-		if (geli_passphrase(&gelipw, dsk.unit, 'p', curent + 1, &dsk) != 0) {
+		if (geli_havekey(&dsk) != 0 && geli_passphrase(&gelipw,
+		    dsk.unit, 'p', curent + 1, &dsk) != 0) {
 			printf("%s: unable to decrypt GELI key\n", BOOTPROG);
 			return (-1);
 		}
@@ -479,9 +481,14 @@ load(void)
     bootinfo.bi_kernelname = VTOP(kname);
     bootinfo.bi_bios_dev = dsk.drive;
 #ifdef LOADER_GELI_SUPPORT
-    geliargs.size = sizeof(geliargs);
-    bcopy(gelipw, geliargs.gelipw, sizeof(geliargs.gelipw));
     explicit_bzero(gelipw, sizeof(gelipw));
+    gelibuf = malloc(sizeof(struct keybuf) + (GELI_MAX_KEYS * sizeof(struct keybuf_ent)));
+    geli_fill_keybuf(gelibuf);
+    geliargs.notapw = '\0';
+    geliargs.keybuf_sentinel = KEYBUF_SENTINEL;
+    geliargs.keybuf = gelibuf;
+#else
+    geliargs.gelipw[0] = '\0';
 #endif
     __exec((caddr_t)addr, RB_BOOTINFO | (opts & RBX_MASK),
 	   MAKEBOOTDEV(dev_maj[dsk.type], dsk.part + 1, dsk.unit, 0xff),

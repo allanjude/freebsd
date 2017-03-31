@@ -53,7 +53,7 @@ geli_fill_keybuf(struct keybuf *fkeybuf)
 		    G_ELI_USERKEYLEN);
 	}
 	fkeybuf->kb_nents = nsaved_keys;
-	bzero(saved_keys, sizeof(saved_keys));
+	explicit_bzero(saved_keys, sizeof(saved_keys));
 }
 
 /*
@@ -68,7 +68,7 @@ geli_save_keybuf(struct keybuf *skeybuf)
 	for (i = 0; i < skeybuf->kb_nents && i < GELI_MAX_KEYS; i++) {
 		memcpy(saved_keys[i], skeybuf->kb_ents[i].ke_data,
 		    G_ELI_USERKEYLEN);
-		bzero(skeybuf->kb_ents[i].ke_data,
+		explicit_bzero(skeybuf->kb_ents[i].ke_data,
 		    G_ELI_USERKEYLEN);
 		skeybuf->kb_ents[i].ke_type = KEYBUF_TYPE_NONE;
 	}
@@ -221,19 +221,24 @@ geli_taste(int read_func(void *vdev, void *priv, off_t off, void *buf,
  * Attempt to decrypt the device
  */
 int
-geli_attach(struct dsk *dskp, const char *passphrase)
+geli_attach(struct dsk *dskp, const char *passphrase, const u_char *mkeyp)
 {
 	u_char key[G_ELI_USERKEYLEN], mkey[G_ELI_DATAIVKEYLEN], *mkp;
 	u_int keynum;
 	struct hmac_ctx ctx;
 	int error;
 
+	if (mkeyp != NULL) {
+		memcpy(&mkey, mkeyp, G_ELI_DATAIVKEYLEN);
+		explicit_bzero(mkeyp, G_ELI_DATAIVKEYLEN);
+	}
+
 	SLIST_FOREACH_SAFE(geli_e, &geli_head, entries, geli_e_tmp) {
 		if (geli_same_device(geli_e, dskp) != 0) {
 			continue;
 		}
 
-		if (geli_findkey(geli_e, dskp, mkey) == 0) {
+		if (mkeyp != NULL || geli_findkey(geli_e, dskp, mkey) == 0) {
 			goto found_key;
 		}
 
@@ -266,19 +271,20 @@ geli_attach(struct dsk *dskp, const char *passphrase)
 		g_eli_crypto_hmac_final(&ctx, key, 0);
 
 		error = g_eli_mkey_decrypt(&geli_e->md, key, mkey, &keynum);
-		explicit_bzero(key, sizeof(key));
 		if (error == -1) {
 			explicit_bzero(mkey, sizeof(mkey));
+			explicit_bzero(key, sizeof(key));
 			printf("Bad GELI key: bad password?\n");
 			return (error);
 		} else if (error != 0) {
 			explicit_bzero(mkey, sizeof(mkey));
+			explicit_bzero(key, sizeof(key));
                         printf("Failed to decrypt GELI master key: %d\n", error);
 			return (error);
 		} else {
                         /* Add key to keychain */
                         save_key(key);
-                        bzero(&key, sizeof(key));
+                        explicit_bzero(&key, sizeof(key));
                 }
 
 found_key:
@@ -396,13 +402,12 @@ geli_havekey(struct dsk *dskp)
 		}
 
 		if (geli_findkey(geli_e, dskp, mkey) == 0) {
-			bzero(mkey, sizeof(mkey));
-			if (geli_attach(dskp, NULL) == 0) {
+			if (geli_attach(dskp, NULL, mkey) == 0) {
 				return (0);
 			}
 		}
 	}
-	bzero(mkey, sizeof(mkey));
+	explicit_bzero(mkey, sizeof(mkey));
 
 	return (1);
 }
@@ -416,14 +421,14 @@ geli_passphrase(char *pw, int disk, int parttype, int part, struct dsk *dskp)
 	for (i = 0; i < 3; i++) {
 		/* Try cached passphrase */
 		if (i == 0 && pw[0] != '\0') {
-			if (geli_attach(dskp, pw) == 0) {
+			if (geli_attach(dskp, pw, NULL) == 0) {
 				return (0);
 			}
 		}
 		printf("GELI Passphrase for disk%d%c%d: ", disk, parttype, part);
 		pwgets(pw, GELI_PW_MAXLEN);
 		printf("\n");
-		if (geli_attach(dskp, pw) == 0) {
+		if (geli_attach(dskp, pw, NULL) == 0) {
 			return (0);
 		}
 	}

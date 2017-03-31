@@ -180,7 +180,7 @@ main(void)
 	    }
 	    if (zargs->gelipw[0] != '\0') {
 		setenv("kern.geom.eli.passphrase", zargs->gelipw, 1);
-		bzero(zargs->gelipw, sizeof(zargs->gelipw));
+		explicit_bzero(zargs->gelipw, sizeof(zargs->gelipw));
 	    }
 	}
     }
@@ -195,7 +195,7 @@ main(void)
 	    }
 	    if (gargs->gelipw[0] != '\0') {
 		setenv("kern.geom.eli.passphrase", gargs->gelipw, 1);
-		bzero(gargs->gelipw, sizeof(gargs->gelipw));
+		explicit_bzero(gargs->gelipw, sizeof(gargs->gelipw));
 	    }
 	}
     }

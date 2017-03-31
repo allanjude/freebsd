@@ -929,7 +929,7 @@ load(void)
     zfsargs.root = zfsmount.rootobj;
     zfsargs.primary_pool = primary_spa->spa_guid;
 #ifdef LOADER_GELI_SUPPORT
-    bzero(gelipw, sizeof(gelipw));
+    explicit_bzero(gelipw, sizeof(gelipw));
     gelibuf = malloc(sizeof(struct keybuf) + (GELI_MAX_KEYS * sizeof(struct keybuf_ent)));
     geli_fill_keybuf(gelibuf);
     zfsargs.notapw = '\0';

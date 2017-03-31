@@ -175,7 +175,8 @@ main(void)
     if ((kargs->bootflags & KARGS_FLAGS_EXTARG) != 0) {
 	zargs = (struct zfs_boot_args *)(kargs + 1);
 	if (zargs != NULL && zargs->size >= offsetof(struct zfs_boot_args, gelipw)) {
-	    if (zargs->keybuf_sentinel == KEYBUF_SENTINEL) {
+	    if (zargs->size >= offsetof(struct zfs_boot_args, keybuf_sentinel) &&
+	      zargs->keybuf_sentinel == KEYBUF_SENTINEL) {
 		geli_save_keybuf(zargs->keybuf);
 	    }
 	    if (zargs->gelipw[0] != '\0') {

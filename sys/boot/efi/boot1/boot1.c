@@ -902,11 +902,21 @@ main(int argc __unused, CHAR16 *argv[] __unused)
 	printf("   Loader path: %s\n\n", PATH_LOADER_EFI);
 	printf("   Initializing modules:");
 
+	bcache_init(32768, 512);
+
 	for (i = 0; efi_drivers[i] != NULL; i++) {
 		printf(" %s", efi_drivers[i]->name);
 		if (efi_drivers[i]->init != NULL)
 			efi_drivers[i]->init();
 	}
+
+	for (i = 0; devsw[i] != NULL; i++) {
+                if (devsw[i]->dv_init != NULL) {
+                        printf(" %s", devsw[i]->dv_name);
+			(devsw[i]->dv_init)();
+                }
+        }
+
 	putchar('\n');
 
 	try_boot();

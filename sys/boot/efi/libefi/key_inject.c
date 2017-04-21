@@ -30,10 +30,11 @@
 #include <efi.h>
 #include <efilib.h>
 #include <efisec.h>
-#include <machine/metadata.h>
 #include <stdbool.h>
 #include <string.h>
 #include <bootstrap.h>
+
+#include <sys/linker.h>
 
 #include "efi_drivers.h"
 #include "key_inject.h"
@@ -85,7 +86,7 @@ static EFI_GUID KernelKeyInjectorGuid = KERNEL_KEY_INJECTOR_GUID;
 static EFI_KMS_SERVICE key_inject_kms;
 
 static void
-fill_keybuf(keybuf_t* keybuf)
+fill_keybuf(struct keybuf *keybuf)
 {
         int i, idx;
 
@@ -117,7 +118,8 @@ register_client_impl(EFI_KMS_SERVICE *This,
                      UINTN *ClientDataState __unused,
                      VOID **ClientData __unused)
 {
-        size_t keybuf_size = sizeof(keybuf_t) + (MAX_KEYS * sizeof(keybuf_ent_t));
+        size_t keybuf_size = sizeof(struct keybuf) +
+            (MAX_KEYS * sizeof(struct keybuf_ent));
         char buf[keybuf_size];
 	struct preloaded_file *kfp;
 
@@ -131,7 +133,7 @@ register_client_impl(EFI_KMS_SERVICE *This,
         }
 
 	kfp = (struct preloaded_file *)Client->ClientId;
-        fill_keybuf((keybuf_t*)buf);
+        fill_keybuf((struct keybuf *)buf);
         file_addmetadata(kfp, MODINFOMD_KEYBUF, keybuf_size, buf);
 
         return (EFI_SUCCESS);

@@ -36,6 +36,8 @@ typedef struct efi_driver_t {
         void (*init)(void);
 } efi_driver_t;
 
+extern const efi_driver_t *efi_drivers[];
+
 extern int efipart_getdesc(struct devdesc *dev, char **out);
 
 /* EFI drivers. */

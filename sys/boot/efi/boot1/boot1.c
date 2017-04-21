@@ -53,7 +53,7 @@ __FBSDID("$FreeBSD$");
 
 struct arch_switch archsw;	/* MI/MD interface boundary */
 
-static const efi_driver_t *efi_drivers[] = {
+const efi_driver_t *efi_drivers[] = {
         &key_inject_driver,
         &geli_driver,
         NULL

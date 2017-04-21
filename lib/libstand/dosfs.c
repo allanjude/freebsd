@@ -187,8 +187,10 @@ dos_mount(DOS_FS *fs, struct open_file *fd)
     bzero(fs, sizeof(DOS_FS));
     fs->fd = fd;
 
+    printf("dosfs_mount\n");
     if ((buf = malloc(secbyt(1))) == NULL)
         return (errno);
+    printf("dosfs_mount 2\n");
     if ((err = ioget(fs->fd, 0, buf, secbyt(1))) ||
         (err = parsebs(fs, (DOS_BS *)buf))) {
         free(buf);
@@ -196,14 +198,17 @@ dos_mount(DOS_FS *fs, struct open_file *fd)
     }
     free(buf);
 
+    printf("dosfs_mount 3\n");
     if ((fs->fatbuf = malloc(FATBLKSZ)) == NULL)
         return (errno);
+    printf("dosfs_mount 4\n");
     err = dos_read_fatblk(fs, fd, 0);
     if (err != 0) {
         free(fs->fatbuf);
         return (err);
     }
 
+    printf("dosfs_mount 5\n");
     fs->root = dot[0];
     fs->root.name[0] = ' ';
     if (fs->fatsz == 32) {
@@ -243,11 +248,13 @@ dos_open(const char *path, struct open_file *fd)
     /* Allocate mount structure, associate with open */
     if ((fs = malloc(sizeof(DOS_FS))) == NULL)
         return (errno);
+    printf("dosfs_mount\n");
     if ((err = dos_mount(fs, fd))) {
         free(fs);
         return (err);
     }
 
+    printf("namede\n");
     if ((err = namede(fs, path, &de))) {
         dos_unmount(fs);
         return (err);
@@ -262,6 +269,7 @@ dos_open(const char *path, struct open_file *fd)
         dos_unmount(fs);
         return (EINVAL);
     }
+    printf("malloc\n");
     if ((f = malloc(sizeof(DOS_FILE))) == NULL) {
         err = errno;
         dos_unmount(fs);
@@ -272,6 +280,7 @@ dos_open(const char *path, struct open_file *fd)
     fs->links++;
     f->de = *de;
     fd->f_fsdata = (void *)f;
+    printf("done\n");
     return (0);
 }
 
@@ -447,7 +456,7 @@ dos_readdir(struct open_file *fd, struct dirent *d)
 
 	/* Check if directory entry is volume label */
 	if (dd.de.attr & FA_LABEL) {
-	    /* 
+	    /*
 	     * If volume label set, check if the current entry is
 	     * extended entry (FA_XDE) for long file names.
 	     */
@@ -860,6 +869,8 @@ ioget(struct open_file *fd, daddr_t lsec, void *buf, size_t size)
 
     /* Make sure we get full read or error. */
     rsize = 0;
+    printf("ioget\n");
+    printf("%p %p\n", fd, fd->f_dev);
     rv = (fd->f_dev->dv_strategy)(fd->f_devdata, F_READ, lsec,
         size, buf, &rsize);
     if ((rv == 0) && (size != rsize))

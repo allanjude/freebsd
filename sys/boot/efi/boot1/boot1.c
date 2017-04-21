@@ -106,13 +106,6 @@ efi_autoload(void)
   return (-1);
 }
 
-static int efi_getdev(void **vdev __unused, const char *devspec __unused,
-    const char **path __unused)
-{
-  printf("******** Boot block should not call getdev\n");
-  return (-1);
-}
-
 static ssize_t
 efi_copyin(const void *src __unused, vm_offset_t dest __unused,
     const size_t len __unused)
@@ -439,14 +432,19 @@ probe_fs(struct devdesc *dev, const char *filepath)
         struct open_file f;
         int i, err;
 
+        printf("Probing device for filesystems\n");
+        f.f_dev = dev->d_dev;
+
+        printf("Opening device\n");
         if ((err = dev->d_dev->dv_open(&f, dev)) != 0) {
                 return errno_to_efi_status(err);
         }
 
-        f.f_dev = dev->d_dev;
-
+        printf("Trying filesystems\n");
         for (i = 0; file_system[i] != NULL; i++) {
+                f.f_ops = file_system[i];
                 if ((err = file_system[i]->fo_open(filepath, &f)) == 0) {
+                  printf("Success\n");
                         file_system[i]->fo_close(&f);
                         dev->d_dev->dv_close(&f);
                         loaddev = dev;
@@ -456,6 +454,7 @@ probe_fs(struct devdesc *dev, const char *filepath)
                 }
         }
 
+        printf("Probe failed\n");
         dev->d_dev->dv_close(&f);
 
         return (ENOTSUP);
@@ -464,14 +463,19 @@ probe_fs(struct devdesc *dev, const char *filepath)
 static int
 probe_dev(struct devsw *dev, int unit, const char *filepath)
 {
-        static struct devdesc currdev;
+        struct devdesc *currdev = malloc(sizeof (struct devdesc));
+        int err;
 
-	currdev.d_dev = dev;
-	currdev.d_type = currdev.d_dev->dv_type;
-	currdev.d_unit = unit;
-	currdev.d_opendata = NULL;
+	currdev->d_dev = dev;
+	currdev->d_type = currdev->d_dev->dv_type;
+	currdev->d_unit = unit;
+	currdev->d_opendata = NULL;
 
-        return (probe_fs(&currdev, filepath));
+        if ((err = probe_fs(currdev, filepath)) != 0) {
+                free(currdev);
+        }
+
+        return (err);
 }
 
 static int
@@ -486,52 +490,60 @@ load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
 	int unit;
 	uint64_t extra;
 
+        printf("Trying preferred partitions\n");
 #ifdef EFI_ZFS_BOOT
 	/* Did efi_zfs_probe() detect the boot pool? */
 	if (pool_guid != 0) {
-		static struct zfs_devdesc currdev;
+                struct zfs_devdesc *currdev = malloc(sizeof (struct zfs_devdesc));
 
-		currdev.d_dev = &zfs_dev;
-		currdev.d_unit = 0;
-		currdev.d_type = currdev.d_dev->dv_type;
-		currdev.d_opendata = NULL;
-		currdev.pool_guid = pool_guid;
-		currdev.root_guid = 0;
+                printf("Trying ZFS\n");
+		currdev->d_dev = &zfs_dev;
+		currdev->d_unit = 0;
+		currdev->d_type = currdev->d_dev->dv_type;
+		currdev->d_opendata = NULL;
+		currdev->pool_guid = pool_guid;
+		currdev->root_guid = 0;
 
-                if (probe_fs((struct devdesc *)&currdev, filepath) == 0 &&
+                if (probe_fs((struct devdesc *)currdev, filepath) == 0 &&
                     do_load(filepath, bufp, bufsize) == EFI_SUCCESS) {
                         *handlep = img->DeviceHandle;
                         return (0);
                 }
+
+                free(currdev);
 	}
 #endif /* EFI_ZFS_BOOT */
 
 	/* We have device lists for hd, cd, fd, walk them all. */
+        printf("Trying disks\n");
 	pdi_list = efiblk_get_pdinfo_list(&efipart_hddev);
 	STAILQ_FOREACH(dp, pdi_list, pd_link) {
-		static struct disk_devdesc currdev;
+                struct disk_devdesc *currdev = malloc(sizeof (struct disk_devdesc));
 
-		currdev.d_dev = &efipart_hddev;
-		currdev.d_type = currdev.d_dev->dv_type;
-		currdev.d_unit = dp->pd_unit;
-		currdev.d_opendata = NULL;
-		currdev.d_slice = -1;
-		currdev.d_partition = -1;
+		currdev->d_dev = &efipart_hddev;
+		currdev->d_type = currdev->d_dev->dv_type;
+		currdev->d_unit = dp->pd_unit;
+		currdev->d_opendata = NULL;
+		currdev->d_slice = -1;
+		currdev->d_partition = -1;
 
-		if (dp->pd_handle == img->DeviceHandle &&
-                    probe_fs((struct devdesc *)&currdev, filepath) == 0 &&
+                printf("Trying main disk\n");
+	        if (dp->pd_handle == img->DeviceHandle &&
+                    probe_fs((struct devdesc *)currdev, filepath) == 0 &&
                     do_load(filepath, bufp, bufsize) == EFI_SUCCESS) {
                         *handlep = img->DeviceHandle;
                         return (0);
 		}
 
+                printf("Trying subpartitions\n");
                 /* Assuming GPT partitioning. */
 		STAILQ_FOREACH(pp, &dp->pd_part, pd_link) {
 			if (pp->pd_handle == img->DeviceHandle) {
-				currdev.d_slice = pp->pd_unit;
-				currdev.d_partition = 255;
+				currdev->d_slice = pp->pd_unit;
+				currdev->d_partition = 255;
 
-                                if (probe_fs((struct devdesc *)&currdev,
+                                printf("Trying subpartition\n");
+                                if (probe_fs((struct devdesc *)currdev,
                                         filepath) == 0 &&
                                     do_load(filepath, bufp, bufsize) ==
                                         EFI_SUCCESS) {
@@ -540,8 +552,11 @@ load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
                                 }
 			}
 		}
+
+                free(currdev);
 	}
 
+        printf("Trying CDs\n");
 	pdi_list = efiblk_get_pdinfo_list(&efipart_cddev);
 	STAILQ_FOREACH(dp, pdi_list, pd_link) {
                 if ((dp->pd_handle == img->DeviceHandle ||
@@ -553,9 +568,10 @@ load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
 		}
 	}
 
+        printf("Trying floppies\n");
 	pdi_list = efiblk_get_pdinfo_list(&efipart_fddev);
 	STAILQ_FOREACH(dp, pdi_list, pd_link) {
-		if (dp->pd_handle == img->DeviceHandle &&
+        	if (dp->pd_handle == img->DeviceHandle &&
                     probe_dev(&efipart_cddev, dp->pd_unit, filepath) == 0 &&
                     do_load(filepath, bufp, bufsize) == EFI_SUCCESS) {
                         *handlep = img->DeviceHandle;
@@ -569,6 +585,7 @@ load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
 	 * any of the nodes in that path match one of the enumerated
 	 * handles.
 	 */
+        printf("Trying device handles\n");
 	if (efi_handle_lookup(img->DeviceHandle, &dev, &unit, &extra) == 0 &&
             probe_dev(dev, dp->pd_unit, filepath) == 0 &&
             do_load(filepath, bufp, bufsize) == EFI_SUCCESS) {
@@ -579,6 +596,7 @@ load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
 	copy = NULL;
 	devpath = efi_lookup_image_devpath(IH);
 	while (devpath != NULL) {
+          printf("Trying next level device path\n");
 		h = efi_devpath_handle(devpath);
 		if (h == NULL)
 			break;
@@ -615,38 +633,42 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
 
 #ifdef EFI_ZFS_BOOT
 	zfsi_list = efizfs_get_zfsinfo_list();
+        printf("Trying ZFS devices\n");
 	STAILQ_FOREACH(zi, zfsi_list, zi_link) {
-		static struct zfs_devdesc currdev;
+                struct zfs_devdesc *currdev = malloc(sizeof (struct zfs_devdesc));
 
-		currdev.d_dev = &zfs_dev;
-		currdev.d_unit = 0;
-		currdev.d_type = currdev.d_dev->dv_type;
-		currdev.d_opendata = NULL;
-		currdev.pool_guid = pool_guid;
-		currdev.root_guid = 0;
+		currdev->d_dev = &zfs_dev;
+		currdev->d_unit = 0;
+		currdev->d_type = currdev->d_dev->dv_type;
+		currdev->d_opendata = NULL;
+		currdev->pool_guid = pool_guid;
+		currdev->root_guid = 0;
 
-                if (probe_fs((struct devdesc *)&currdev, filepath) == 0 &&
+                if (probe_fs((struct devdesc *)currdev, filepath) == 0 &&
                     do_load(filepath, bufp, bufsize) == EFI_SUCCESS) {
                         *handlep = zi->zi_handle;
 
                         return (0);
                 }
+
+                free(currdev);
 	}
 #endif /* EFI_ZFS_BOOT */
 
+        printf("Trying disks\n");
 	/* We have device lists for hd, cd, fd, walk them all. */
 	pdi_list = efiblk_get_pdinfo_list(&efipart_hddev);
 	STAILQ_FOREACH(dp, pdi_list, pd_link) {
-		static struct disk_devdesc currdev;
+                struct disk_devdesc *currdev = malloc(sizeof (struct disk_devdesc));
 
-		currdev.d_dev = &efipart_hddev;
-		currdev.d_type = currdev.d_dev->dv_type;
-		currdev.d_unit = dp->pd_unit;
-		currdev.d_opendata = NULL;
-		currdev.d_slice = -1;
-		currdev.d_partition = -1;
+		currdev->d_dev = &efipart_hddev;
+		currdev->d_type = currdev->d_dev->dv_type;
+		currdev->d_unit = dp->pd_unit;
+		currdev->d_opendata = NULL;
+		currdev->d_slice = -1;
+		currdev->d_partition = -1;
 
-		if (probe_fs((struct devdesc *)&currdev, filepath) == 0 &&
+		if (probe_fs((struct devdesc *)currdev, filepath) == 0 &&
                     do_load(filepath, bufp, bufsize) == EFI_SUCCESS) {
                         *handlep = dp->pd_handle;
 
@@ -655,10 +677,10 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
 
                 /* Assuming GPT partitioning. */
 		STAILQ_FOREACH(pp, &dp->pd_part, pd_link) {
-                        currdev.d_slice = pp->pd_unit;
-                        currdev.d_partition = 255;
+                        currdev->d_slice = pp->pd_unit;
+                        currdev->d_partition = 255;
 
-                        if (probe_fs((struct devdesc *)&currdev,
+                        if (probe_fs((struct devdesc *)currdev,
                                 filepath) == 0 &&
                             do_load(filepath, bufp, bufsize) == EFI_SUCCESS) {
                                 *handlep = pp->pd_handle;
@@ -666,8 +688,11 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
                                 return (0);
 			}
 		}
+
+                free(currdev);
 	}
 
+        printf("Trying CDs\n");
 	pdi_list = efiblk_get_pdinfo_list(&efipart_cddev);
 	STAILQ_FOREACH(dp, pdi_list, pd_link) {
 		if (probe_dev(&efipart_cddev, dp->pd_unit, filepath) == 0 &&
@@ -678,6 +703,7 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
 		}
 	}
 
+        printf("Trying floppies\n");
 	pdi_list = efiblk_get_pdinfo_list(&efipart_fddev);
 	STAILQ_FOREACH(dp, pdi_list, pd_link) {
 		if (probe_dev(&efipart_fddev, dp->pd_unit, filepath) == 0 &&
@@ -691,24 +717,13 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
 	return (ENOENT);
 }
 
-/*
- * load_loader attempts to load the loader image data.
- *
- * This tries all handles which support the EFI_SIMPLE_FILE_SYSTEM interface.
- * It is expected that the drivers will have installed this interface on every
- * handle representing a device containing a supported file system.
- *
- * Note: In the future, this may be altered to use the EFI_LOAD_FILE interface,
- * which should work transparently with network booting.
- *
- * Only devices which have preferred matching the preferred parameter are tried.
- */
 static EFI_STATUS
 load_loader(EFI_HANDLE *handlep, void **bufp, size_t *bufsize)
 {
 	EFI_LOADED_IMAGE *boot_image;
         EFI_STATUS status;
 
+        printf("Attempting to load loader\n");
 	if ((status = BS->OpenProtocol(IH, &LoadedImageGUID,
             (VOID**)&boot_image, IH, NULL,
             EFI_OPEN_PROTOCOL_GET_PROTOCOL)) != EFI_SUCCESS) {
@@ -719,10 +734,12 @@ load_loader(EFI_HANDLE *handlep, void **bufp, size_t *bufsize)
         /* Try the preferred handles first, then all the handles */
         if (load_preferred(boot_image, PATH_LOADER_EFI, bufp, bufsize,
                 handlep) == 0) {
+                printf("Loaded from preferred partition\n");
                 return (0);
         }
 
         if (load_all(PATH_LOADER_EFI, bufp, bufsize, handlep) == 0) {
+                printf("Loaded from all partitions\n");
                 return (0);
         }
 

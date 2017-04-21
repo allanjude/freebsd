@@ -384,6 +384,7 @@ do_load(const char *filepath, void **bufp, size_t *bufsize)
 
         f.f_ops = loadfs;
         f.f_dev = loaddev->d_dev;
+        f.f_devdata = loaddev;
 
         if ((err = f.f_dev->dv_open(&f, loaddev)) != 0) {
                 return errno_to_efi_status(err);
@@ -432,19 +433,16 @@ probe_fs(struct devdesc *dev, const char *filepath)
         struct open_file f;
         int i, err;
 
-        printf("Probing device for filesystems\n");
         f.f_dev = dev->d_dev;
+        f.f_devdata = dev;
 
-        printf("Opening device\n");
         if ((err = dev->d_dev->dv_open(&f, dev)) != 0) {
                 return errno_to_efi_status(err);
         }
 
-        printf("Trying filesystems\n");
         for (i = 0; file_system[i] != NULL; i++) {
                 f.f_ops = file_system[i];
                 if ((err = file_system[i]->fo_open(filepath, &f)) == 0) {
-                  printf("Success\n");
                         file_system[i]->fo_close(&f);
                         dev->d_dev->dv_close(&f);
                         loaddev = dev;
@@ -454,7 +452,6 @@ probe_fs(struct devdesc *dev, const char *filepath)
                 }
         }
 
-        printf("Probe failed\n");
         dev->d_dev->dv_close(&f);
 
         return (ENOTSUP);
@@ -490,13 +487,11 @@ load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
 	int unit;
 	uint64_t extra;
 
-        printf("Trying preferred partitions\n");
 #ifdef EFI_ZFS_BOOT
 	/* Did efi_zfs_probe() detect the boot pool? */
 	if (pool_guid != 0) {
                 struct zfs_devdesc *currdev = malloc(sizeof (struct zfs_devdesc));
 
-                printf("Trying ZFS\n");
 		currdev->d_dev = &zfs_dev;
 		currdev->d_unit = 0;
 		currdev->d_type = currdev->d_dev->dv_type;
@@ -515,7 +510,6 @@ load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
 #endif /* EFI_ZFS_BOOT */
 
 	/* We have device lists for hd, cd, fd, walk them all. */
-        printf("Trying disks\n");
 	pdi_list = efiblk_get_pdinfo_list(&efipart_hddev);
 	STAILQ_FOREACH(dp, pdi_list, pd_link) {
                 struct disk_devdesc *currdev = malloc(sizeof (struct disk_devdesc));
@@ -527,7 +521,6 @@ load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
 		currdev->d_slice = -1;
 		currdev->d_partition = -1;
 
-                printf("Trying main disk\n");
 	        if (dp->pd_handle == img->DeviceHandle &&
                     probe_fs((struct devdesc *)currdev, filepath) == 0 &&
                     do_load(filepath, bufp, bufsize) == EFI_SUCCESS) {
@@ -535,14 +528,12 @@ load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
                         return (0);
 		}
 
-                printf("Trying subpartitions\n");
                 /* Assuming GPT partitioning. */
 		STAILQ_FOREACH(pp, &dp->pd_part, pd_link) {
 			if (pp->pd_handle == img->DeviceHandle) {
 				currdev->d_slice = pp->pd_unit;
 				currdev->d_partition = 255;
 
-                                printf("Trying subpartition\n");
                                 if (probe_fs((struct devdesc *)currdev,
                                         filepath) == 0 &&
                                     do_load(filepath, bufp, bufsize) ==
@@ -556,7 +547,6 @@ load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
                 free(currdev);
 	}
 
-        printf("Trying CDs\n");
 	pdi_list = efiblk_get_pdinfo_list(&efipart_cddev);
 	STAILQ_FOREACH(dp, pdi_list, pd_link) {
                 if ((dp->pd_handle == img->DeviceHandle ||
@@ -568,7 +558,6 @@ load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
 		}
 	}
 
-        printf("Trying floppies\n");
 	pdi_list = efiblk_get_pdinfo_list(&efipart_fddev);
 	STAILQ_FOREACH(dp, pdi_list, pd_link) {
         	if (dp->pd_handle == img->DeviceHandle &&
@@ -585,7 +574,6 @@ load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
 	 * any of the nodes in that path match one of the enumerated
 	 * handles.
 	 */
-        printf("Trying device handles\n");
 	if (efi_handle_lookup(img->DeviceHandle, &dev, &unit, &extra) == 0 &&
             probe_dev(dev, dp->pd_unit, filepath) == 0 &&
             do_load(filepath, bufp, bufsize) == EFI_SUCCESS) {
@@ -596,7 +584,6 @@ load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
 	copy = NULL;
 	devpath = efi_lookup_image_devpath(IH);
 	while (devpath != NULL) {
-          printf("Trying next level device path\n");
 		h = efi_devpath_handle(devpath);
 		if (h == NULL)
 			break;
@@ -633,7 +620,6 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
 
 #ifdef EFI_ZFS_BOOT
 	zfsi_list = efizfs_get_zfsinfo_list();
-        printf("Trying ZFS devices\n");
 	STAILQ_FOREACH(zi, zfsi_list, zi_link) {
                 struct zfs_devdesc *currdev = malloc(sizeof (struct zfs_devdesc));
 
@@ -655,7 +641,6 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
 	}
 #endif /* EFI_ZFS_BOOT */
 
-        printf("Trying disks\n");
 	/* We have device lists for hd, cd, fd, walk them all. */
 	pdi_list = efiblk_get_pdinfo_list(&efipart_hddev);
 	STAILQ_FOREACH(dp, pdi_list, pd_link) {
@@ -692,7 +677,6 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
                 free(currdev);
 	}
 
-        printf("Trying CDs\n");
 	pdi_list = efiblk_get_pdinfo_list(&efipart_cddev);
 	STAILQ_FOREACH(dp, pdi_list, pd_link) {
 		if (probe_dev(&efipart_cddev, dp->pd_unit, filepath) == 0 &&
@@ -703,7 +687,6 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
 		}
 	}
 
-        printf("Trying floppies\n");
 	pdi_list = efiblk_get_pdinfo_list(&efipart_fddev);
 	STAILQ_FOREACH(dp, pdi_list, pd_link) {
 		if (probe_dev(&efipart_fddev, dp->pd_unit, filepath) == 0 &&
@@ -723,7 +706,6 @@ load_loader(EFI_HANDLE *handlep, void **bufp, size_t *bufsize)
 	EFI_LOADED_IMAGE *boot_image;
         EFI_STATUS status;
 
-        printf("Attempting to load loader\n");
 	if ((status = BS->OpenProtocol(IH, &LoadedImageGUID,
             (VOID**)&boot_image, IH, NULL,
             EFI_OPEN_PROTOCOL_GET_PROTOCOL)) != EFI_SUCCESS) {
@@ -734,16 +716,12 @@ load_loader(EFI_HANDLE *handlep, void **bufp, size_t *bufsize)
         /* Try the preferred handles first, then all the handles */
         if (load_preferred(boot_image, PATH_LOADER_EFI, bufp, bufsize,
                 handlep) == 0) {
-                printf("Loaded from preferred partition\n");
                 return (0);
         }
 
         if (load_all(PATH_LOADER_EFI, bufp, bufsize, handlep) == 0) {
-                printf("Loaded from all partitions\n");
                 return (0);
         }
-
-        printf("Failed to load %s from any device!\n", PATH_LOADER_EFI);
 
 	return (EFI_NOT_FOUND);
 }

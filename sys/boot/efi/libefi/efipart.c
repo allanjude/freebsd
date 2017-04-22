@@ -399,6 +399,7 @@ efipart_hdinfo_add(EFI_HANDLE disk_handle, EFI_HANDLE part_handle)
 	hd->pd_unit = unit;
 	hd->pd_devpath = disk_devpath;
 	STAILQ_INSERT_TAIL(&hdinfo, hd, pd_link);
+        printf("Registering disk %p\n", disk_handle);
 
 	pd = malloc(sizeof(pdinfo_t));
 	if (pd == NULL) {

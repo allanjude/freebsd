@@ -743,7 +743,9 @@ try_boot(void)
 	EFI_STATUS status;
         EFI_DEVICE_PATH *fspath;
 
+        printf("Starting boot process\n");
 	status = load_loader(&fshandle, &loaderbuf, &loadersize);
+        printf("Got loader, setting up to boot\n");
 
         if (status != EFI_SUCCESS) {
                 return (status);
@@ -770,6 +772,7 @@ try_boot(void)
 	 * loading the actual kernel sort all that out. Since these files are
 	 * optional, we don't report errors in trying to read them.
 	 */
+        printf("Loading config files\n");
 	cmd = NULL;
 	cmdsize = 0;
 	status = do_load(PATH_DOTCONFIG, &buf, &bufsize);
@@ -786,6 +789,7 @@ try_boot(void)
 		buf = NULL;
 	}
 
+        printf("Preparing image\n");
 	if ((status = BS->LoadImage(TRUE, IH, devpath_last(fspath),
 	    loaderbuf, loadersize, &loaderhandle)) != EFI_SUCCESS) {
 		printf("Failed to load image, size: %zu, (%lu)\n",
@@ -820,6 +824,7 @@ try_boot(void)
 	DSTALL(1000000);
 	DPRINTF(".\n");
 
+        printf("Booting\n");
 	if ((status = BS->StartImage(loaderhandle, NULL, NULL)) !=
 	    EFI_SUCCESS) {
 		printf("Failed to start image (%lu)\n",
@@ -896,22 +901,20 @@ main(int argc __unused, CHAR16 *argv[] __unused)
 	archsw.arch_readin = efi_readin;
 
 	printf("   Loader path: %s\n\n", PATH_LOADER_EFI);
-	printf("   Initializing modules:");
-
-	bcache_init(32768, 512);
 
 	for (i = 0; efi_drivers[i] != NULL; i++) {
-		printf(" %s", efi_drivers[i]->name);
 		if (efi_drivers[i]->init != NULL)
 			efi_drivers[i]->init();
 	}
 
+        printf("Probing devices:");
 	for (i = 0; devsw[i] != NULL; i++) {
+                printf(" %s", devsw[i]->dv_name);
                 if (devsw[i]->dv_init != NULL) {
-                        printf(" %s", devsw[i]->dv_name);
 			(devsw[i]->dv_init)();
                 }
         }
+        printf("\nDone\n");
 
 	putchar('\n');
 

@@ -598,6 +598,8 @@ reset_impl(EFI_BLOCK_IO *This, BOOLEAN ev)
 {
         geli_info_t *info = (geli_info_t*)(This + 1);
 
+        printf("reset_impl\n");
+
         return info->blkio->Reset(info->blkio, ev);
 }
 
@@ -613,6 +615,9 @@ read_impl(EFI_BLOCK_IO *This, UINT32 MediaID, EFI_LBA LBA,
 	size_t n, nb;
 	struct g_eli_key gkey;
         EFI_STATUS status;
+
+        printf("read_impl(%p, %u, %lu, %lu, %p)\n",
+               This, MediaID, LBA, BufferSize, Buffer);
 
         // Read the raw data
         status = info->blkio->ReadBlocks(info->blkio,
@@ -657,6 +662,8 @@ static EFI_STATUS EFIAPI
 write_impl(EFI_BLOCK_IO *This __unused, UINT32 MediaID __unused,
     EFI_LBA LBA __unused, UINTN BufferSize __unused, VOID *Buffer __unused)
 {
+        printf("write_impl(%p, %u, %lu, %lu, %p)\n",
+               This, MediaID, LBA, BufferSize, Buffer);
         return (EFI_UNSUPPORTED);
 }
 
@@ -715,16 +722,6 @@ supported_impl(EFI_DRIVER_BINDING *This, EFI_HANDLE handle,
         return (BS->OpenProtocol(handle, &BlockIOProtocolGUID, NULL,
             This->DriverBindingHandle, handle,
             EFI_OPEN_PROTOCOL_TEST_PROTOCOL));
-}
-
-static size_t
-wcslen(const CHAR16 *s)
-{
-        size_t len;
-
-        for(len = 0; s[len] != '\0'; len++);
-
-        return len;
 }
 
 static EFI_STATUS EFIAPI
@@ -838,6 +835,7 @@ start_impl(EFI_DRIVER_BINDING *This, EFI_HANDLE handle,
         /* Make Block IO interface */
         newio = make_block_io_iface(&md, &sc, blkio, handle);
         info = (geli_info_t*)(newio + 1);
+        info->diskio = driver_diskio;
         BS->CloseProtocol(handle, &BlockIOProtocolGUID,
             This->DriverBindingHandle, handle);
 

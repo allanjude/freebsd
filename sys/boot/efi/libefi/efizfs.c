@@ -59,6 +59,27 @@ insert_zfs(EFI_HANDLE handle, uint64_t guid)
         STAILQ_INSERT_TAIL(&zfsinfo, zi, zi_link);
 }
 
+static size_t
+wcslen(const CHAR16 *s)
+{
+        size_t len;
+
+        for(len = 0; s[len] != '\0'; len++);
+
+        return len;
+}
+
+static void
+efifs_dev_print(EFI_DEVICE_PATH *devpath)
+{
+        CHAR16 *name16;
+
+        name16 = efi_devpath_name(devpath);
+        char buf[wcslen(name16) + 1];
+        cpy16to8(name16, buf, wcslen(name16));
+        printf("%s\n", buf);
+}
+
 void
 efi_zfs_probe(void)
 {
@@ -84,6 +105,9 @@ efi_zfs_probe(void)
 
 			snprintf(devname, sizeof(devname), "%s%dp%d:",
 			    efipart_hddev.dv_name, hd->pd_unit, pd->pd_unit);
+                        printf("Probing for ZFS on handle %s (%p)\n",
+                               devname, pd->pd_handle);
+                        efifs_dev_print(pd->pd_devpath);
 
                         if (zfs_probe_dev(devname, &guid) == 0) {
                                 insert_zfs(pd->pd_handle, guid);
@@ -94,6 +118,7 @@ efi_zfs_probe(void)
 
 		}
 	}
+        printf("Done probing ZFS\n");
 }
 
 uint64_t

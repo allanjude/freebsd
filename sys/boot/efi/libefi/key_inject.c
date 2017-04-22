@@ -90,11 +90,10 @@ fill_keybuf(struct keybuf *keybuf)
 {
         int i, idx;
 
-        for(i = 0, idx = 0; i < MAX_KEYS; i++) {
-                switch(keys[i].k_service) {
+        for (i = 0, idx = 0; i < MAX_KEYS; i++) {
+                switch (keys[i].k_service) {
                 default:
-                        printf("Unknown service type %u\n",
-                               keys[i].k_service);
+                        printf("Unknown service type %u\n", keys[i].k_service);
 
                 case SERVICE_ID_PASSPHRASE:
                 case SERVICE_ID_NONE:
@@ -103,7 +102,7 @@ fill_keybuf(struct keybuf *keybuf)
                 case SERVICE_ID_GELI:
                         keybuf->kb_ents[idx].ke_type = KEYBUF_TYPE_GELI;
                         memcpy(keybuf->kb_ents[idx].ke_data, keys[i].k_data,
-                               MAX_KEY_BYTES);
+                            MAX_KEY_BYTES);
                         idx++;
                         break;
                 }
@@ -113,10 +112,8 @@ fill_keybuf(struct keybuf *keybuf)
 }
 
 static EFI_STATUS EFIAPI
-register_client_impl(EFI_KMS_SERVICE *This,
-                     EFI_KMS_CLIENT_INFO *Client,
-                     UINTN *ClientDataState __unused,
-                     VOID **ClientData __unused)
+register_client_impl(EFI_KMS_SERVICE *This, EFI_KMS_CLIENT_INFO *Client,
+    UINTN *ClientDataState __unused, VOID **ClientData __unused)
 {
         size_t keybuf_size = sizeof(struct keybuf) +
             (MAX_KEYS * sizeof(struct keybuf_ent));
@@ -142,11 +139,9 @@ register_client_impl(EFI_KMS_SERVICE *This,
 /* We don't support secure creation of keys at runtime! */
 static EFI_STATUS EFIAPI
 create_key_impl(EFI_KMS_SERVICE *This __unused,
-                EFI_KMS_CLIENT_INFO *Client __unused,
-                UINT16 *KeyDescriptorCount __unused,
-                EFI_KMS_KEY_DESCRIPTOR *KeyDescriptor __unused,
-                UINTN *ClientDataSize __unused,
-                VOID **ClientData __unused)
+    EFI_KMS_CLIENT_INFO *Client __unused, UINT16 *KeyDescriptorCount __unused,
+    EFI_KMS_KEY_DESCRIPTOR *KeyDescriptor __unused,
+    UINTN *ClientDataSize __unused, VOID **ClientData __unused)
 {
         return (EFI_UNSUPPORTED);
 }
@@ -154,40 +149,40 @@ create_key_impl(EFI_KMS_SERVICE *This __unused,
 static EFI_STATUS
 key_size(const EFI_GUID *format, size_t *size)
 {
-        if(!memcmp(format, &Generic128Guid, sizeof(EFI_GUID))) {
+        if (!memcmp(format, &Generic128Guid, sizeof(EFI_GUID))) {
                 *size = 128 / 8;
                 return (EFI_SUCCESS);
-        } else if(!memcmp(format, &Generic256Guid, sizeof(EFI_GUID))) {
+        } else if (!memcmp(format, &Generic256Guid, sizeof(EFI_GUID))) {
                 *size = 256 / 8;
                 return (EFI_SUCCESS);
-        } else if(!memcmp(format, &Generic512Guid, sizeof(EFI_GUID))) {
+        } else if (!memcmp(format, &Generic512Guid, sizeof(EFI_GUID))) {
                 *size = 512 / 8;
                 return (EFI_SUCCESS);
-        } else if(!memcmp(format, &Generic1024Guid, sizeof(EFI_GUID))) {
+        } else if (!memcmp(format, &Generic1024Guid, sizeof(EFI_GUID))) {
                 *size = 1024 / 8;
                 return (EFI_SUCCESS);
-        } else if(!memcmp(format, &Generic2048Guid, sizeof(EFI_GUID))) {
+        } else if (!memcmp(format, &Generic2048Guid, sizeof(EFI_GUID))) {
                 *size = 2048 / 8;
                 return (EFI_SUCCESS);
-        } else if(!memcmp(format, &Generic3072Guid, sizeof(EFI_GUID))) {
+        } else if (!memcmp(format, &Generic3072Guid, sizeof(EFI_GUID))) {
                 *size = 3072 / 8;
                 return (EFI_SUCCESS);
-        } else if(!memcmp(format, &AesXts128Guid, sizeof(EFI_GUID))) {
+        } else if (!memcmp(format, &AesXts128Guid, sizeof(EFI_GUID))) {
                 *size = 128 / 8;
                 return (EFI_SUCCESS);
-        } else if(!memcmp(format, &AesXts256Guid, sizeof(EFI_GUID))) {
+        } else if (!memcmp(format, &AesXts256Guid, sizeof(EFI_GUID))) {
                 *size = 256 / 8;
                 return (EFI_SUCCESS);
-        } else if(!memcmp(format, &AesCbc128Guid, sizeof(EFI_GUID))) {
+        } else if (!memcmp(format, &AesCbc128Guid, sizeof(EFI_GUID))) {
                 *size = 128 / 8;
                 return (EFI_SUCCESS);
-        } else if(!memcmp(format, &AesCbc256Guid, sizeof(EFI_GUID))) {
+        } else if (!memcmp(format, &AesCbc256Guid, sizeof(EFI_GUID))) {
                 *size = 256 / 8;
                 return (EFI_SUCCESS);
-        } else if(!memcmp(format, &RsaSha2048Guid, sizeof(EFI_GUID))) {
+        } else if (!memcmp(format, &RsaSha2048Guid, sizeof(EFI_GUID))) {
                 *size = 2048 / 8;
                 return (EFI_SUCCESS);
-        } else if(!memcmp(format, &RsaSha3072Guid, sizeof(EFI_GUID))) {
+        } else if (!memcmp(format, &RsaSha3072Guid, sizeof(EFI_GUID))) {
                 *size = 3072 / 8;
                 return (EFI_SUCCESS);
         } else {
@@ -222,12 +217,11 @@ get_one_key(EFI_KMS_KEY_DESCRIPTOR *KeyDescriptor)
                 if (keys[i].k_id_size != 0 &&
                     keys[i].k_id_size == KeyDescriptor->KeyIdentifierSize &&
                     !memcmp(keys[i].k_id, KeyDescriptor->KeyIdentifier,
-                            keys[i].k_id_size)) {
+                        keys[i].k_id_size)) {
                         memcpy(&(KeyDescriptor->KeyFormat), &keys[i].k_format,
-                               sizeof(EFI_GUID));
+                            sizeof(EFI_GUID));
                         status = copy_key(KeyDescriptor->KeyValue,
-                                          keys[i].k_data,
-                                          &keys[i].k_format);
+                            keys[i].k_data, &keys[i].k_format);
                         KeyDescriptor->KeyStatus = status;
 
                         return;
@@ -238,12 +232,9 @@ get_one_key(EFI_KMS_KEY_DESCRIPTOR *KeyDescriptor)
 }
 
 static EFI_STATUS EFIAPI
-get_key_impl(EFI_KMS_SERVICE *This,
-             EFI_KMS_CLIENT_INFO *Client,
-             UINT16 *KeyDescriptorCount,
-             EFI_KMS_KEY_DESCRIPTOR *KeyDescriptor,
-             UINTN *ClientDataSize __unused,
-             VOID **ClientData __unused)
+get_key_impl(EFI_KMS_SERVICE *This, EFI_KMS_CLIENT_INFO *Client,
+    UINT16 *KeyDescriptorCount, EFI_KMS_KEY_DESCRIPTOR *KeyDescriptor,
+    UINTN *ClientDataSize __unused, VOID **ClientData __unused)
 {
         int i;
 
@@ -270,12 +261,11 @@ add_one_key(EFI_KMS_KEY_DESCRIPTOR *KeyDescriptor)
                 if (keys[i].k_id_size == 0) {
                         keys[i].k_id_size = KeyDescriptor->KeyIdentifierSize;
                         memcpy(keys[i].k_id, KeyDescriptor->KeyIdentifier,
-                               keys[i].k_id_size);
+                            keys[i].k_id_size);
                         memcpy(&(keys[i].k_format), &(KeyDescriptor->KeyFormat),
-                               sizeof(EFI_GUID));
+                            sizeof(EFI_GUID));
                         status = copy_key(keys[i].k_data,
-                                          KeyDescriptor->KeyValue,
-                                          &(keys[i].k_format));
+                            KeyDescriptor->KeyValue, &(keys[i].k_format));
                         KeyDescriptor->KeyStatus = status;
 
                         return;
@@ -287,11 +277,9 @@ add_one_key(EFI_KMS_KEY_DESCRIPTOR *KeyDescriptor)
 
 static EFI_STATUS EFIAPI
 add_key_impl(EFI_KMS_SERVICE *This,
-             EFI_KMS_CLIENT_INFO *Client __unused,
-             UINT16 *KeyDescriptorCount,
-             EFI_KMS_KEY_DESCRIPTOR *KeyDescriptor,
-             UINTN *ClientDataSize __unused,
-             VOID **ClientData __unused)
+    EFI_KMS_CLIENT_INFO *Client __unused, UINT16 *KeyDescriptorCount,
+    EFI_KMS_KEY_DESCRIPTOR *KeyDescriptor, UINTN *ClientDataSize __unused,
+    VOID **ClientData __unused)
 {
         int i;
 
@@ -301,7 +289,7 @@ add_key_impl(EFI_KMS_SERVICE *This,
                 return (EFI_INVALID_PARAMETER);
         }
 
-        for(i = 0; i < *KeyDescriptorCount; i++) {
+        for (i = 0; i < *KeyDescriptorCount; i++) {
                 add_one_key(KeyDescriptor + i);
         }
 
@@ -317,7 +305,7 @@ delete_one_key(EFI_KMS_KEY_DESCRIPTOR *KeyDescriptor)
                 if (keys[i].k_id_size != 0 &&
                     keys[i].k_id_size == KeyDescriptor->KeyIdentifierSize &&
                     !memcmp(keys[i].k_id, KeyDescriptor->KeyIdentifier,
-                            keys[i].k_id_size)) {
+                        keys[i].k_id_size)) {
                         memset(keys + i, 0, sizeof(key_entry_t));
 
                         return;
@@ -329,11 +317,9 @@ delete_one_key(EFI_KMS_KEY_DESCRIPTOR *KeyDescriptor)
 
 static EFI_STATUS EFIAPI
 delete_key_impl(EFI_KMS_SERVICE *This,
-                EFI_KMS_CLIENT_INFO *Client __unused,
-                UINT16 *KeyDescriptorCount,
-                EFI_KMS_KEY_DESCRIPTOR *KeyDescriptor,
-                UINTN *ClientDataSize __unused,
-                VOID **ClientData __unused)
+    EFI_KMS_CLIENT_INFO *Client __unused, UINT16 *KeyDescriptorCount,
+    EFI_KMS_KEY_DESCRIPTOR *KeyDescriptor, UINTN *ClientDataSize __unused,
+    VOID **ClientData __unused)
 {
         int i;
 
@@ -343,7 +329,7 @@ delete_key_impl(EFI_KMS_SERVICE *This,
                 return (EFI_INVALID_PARAMETER);
         }
 
-        for(i = 0; i < *KeyDescriptorCount; i++) {
+        for (i = 0; i < *KeyDescriptorCount; i++) {
                 delete_one_key(KeyDescriptor + i);
         }
 
@@ -361,7 +347,8 @@ static void
 do_get_key_attributes(key_entry_t *entry, EFI_KMS_KEY_ATTRIBUTE *KeyAttributes)
 {
         KeyAttributes[0].KeyAttributeIdentifierType = EFI_KMS_DATA_TYPE_UTF8;
-        KeyAttributes[0].KeyAttributeIdentifierCount = sizeof KEY_ATTR_SERVICE_ID_NAME;
+        KeyAttributes[0].KeyAttributeIdentifierCount =
+            sizeof KEY_ATTR_SERVICE_ID_NAME;
         KeyAttributes[0].KeyAttributeIdentifier = KEY_ATTR_SERVICE_ID_NAME;
         KeyAttributes[0].KeyAttributeInstance = 1;
         KeyAttributes[0].KeyAttributeType = EFI_KMS_ATTRIBUTE_TYPE_INTEGER;
@@ -372,13 +359,10 @@ do_get_key_attributes(key_entry_t *entry, EFI_KMS_KEY_ATTRIBUTE *KeyAttributes)
 
 static EFI_STATUS EFIAPI
 get_key_attributes_impl(EFI_KMS_SERVICE *This,
-                        EFI_KMS_CLIENT_INFO *Client __unused,
-                        UINT8 *KeyIdentifierSize,
-                        const VOID *KeyIdentifier,
-                        UINT16 *KeyAttributesCount,
-                        EFI_KMS_KEY_ATTRIBUTE *KeyAttributes,
-                        UINTN *ClientDataSize __unused,
-                        VOID **ClientData __unused)
+    EFI_KMS_CLIENT_INFO *Client __unused, UINT8 *KeyIdentifierSize,
+    const VOID *KeyIdentifier, UINT16 *KeyAttributesCount,
+    EFI_KMS_KEY_ATTRIBUTE *KeyAttributes, UINTN *ClientDataSize __unused,
+    VOID **ClientData __unused)
 {
         UINTN i;
 
@@ -388,13 +372,13 @@ get_key_attributes_impl(EFI_KMS_SERVICE *This,
         }
 
         if (*KeyAttributesCount < 1) {
-          return (EFI_BUFFER_TOO_SMALL);
+                return (EFI_BUFFER_TOO_SMALL);
         }
 
         for (i = 0; i < MAX_KEYS; i++) {
-                if(keys[i].k_id_size != 0 &&
-                   keys[i].k_id_size == *KeyIdentifierSize &&
-                   !memcmp(keys[i].k_id, KeyIdentifier, *KeyIdentifierSize)) {
+                if (keys[i].k_id_size != 0 &&
+                    keys[i].k_id_size == *KeyIdentifierSize &&
+                    !memcmp(keys[i].k_id, KeyIdentifier, *KeyIdentifierSize)) {
                         do_get_key_attributes(keys + i, KeyAttributes);
 
                         return (EFI_SUCCESS);
@@ -410,8 +394,8 @@ do_add_key_attributes(key_entry_t *entry, EFI_KMS_KEY_ATTRIBUTE *KeyAttribute)
         if (KeyAttribute->KeyAttributeIdentifierCount ==
             KEY_ATTR_SERVICE_ID_NAME_LEN &&
             !memcmp(KEY_ATTR_SERVICE_ID_NAME,
-                    KeyAttribute->KeyAttributeIdentifier,
-                    KEY_ATTR_SERVICE_ID_NAME_LEN)) {
+                KeyAttribute->KeyAttributeIdentifier,
+                KEY_ATTR_SERVICE_ID_NAME_LEN)) {
                 entry->k_service = *((int*)(KeyAttribute->KeyAttributeValue));
                 KeyAttribute->KeyAttributeStatus = EFI_SUCCESS;
         } else {
@@ -421,13 +405,10 @@ do_add_key_attributes(key_entry_t *entry, EFI_KMS_KEY_ATTRIBUTE *KeyAttribute)
 
 static EFI_STATUS EFIAPI
 add_key_attributes_impl(EFI_KMS_SERVICE *This,
-                        EFI_KMS_CLIENT_INFO *Client __unused,
-                        UINT8 *KeyIdentifierSize,
-                        const VOID *KeyIdentifier,
-                        UINT16 *KeyAttributesCount,
-                        EFI_KMS_KEY_ATTRIBUTE *KeyAttributes,
-                        UINTN *ClientDataSize __unused,
-                        VOID **ClientData __unused)
+    EFI_KMS_CLIENT_INFO *Client __unused, UINT8 *KeyIdentifierSize,
+    const VOID *KeyIdentifier, UINT16 *KeyAttributesCount,
+    EFI_KMS_KEY_ATTRIBUTE *KeyAttributes, UINTN *ClientDataSize __unused,
+    VOID **ClientData __unused)
 {
         UINTN i, j;
 
@@ -442,7 +423,7 @@ add_key_attributes_impl(EFI_KMS_SERVICE *This,
                    !memcmp(keys[i].k_id, KeyIdentifier, *KeyIdentifierSize)) {
                         for (j = 0; j < *KeyAttributesCount; j++) {
                                 do_add_key_attributes(keys + i,
-                                                      KeyAttributes + j);
+                                    KeyAttributes + j);
 
                         }
 
@@ -454,13 +435,14 @@ add_key_attributes_impl(EFI_KMS_SERVICE *This,
 }
 
 static void
-do_delete_key_attributes(key_entry_t *entry, EFI_KMS_KEY_ATTRIBUTE *KeyAttribute)
+do_delete_key_attributes(key_entry_t *entry,
+    EFI_KMS_KEY_ATTRIBUTE *KeyAttribute)
 {
         if (KeyAttribute->KeyAttributeIdentifierCount ==
             KEY_ATTR_SERVICE_ID_NAME_LEN &&
             !memcmp(KEY_ATTR_SERVICE_ID_NAME,
-                    KeyAttribute->KeyAttributeIdentifier,
-                    KEY_ATTR_SERVICE_ID_NAME_LEN)) {
+                KeyAttribute->KeyAttributeIdentifier,
+                KEY_ATTR_SERVICE_ID_NAME_LEN)) {
                 entry->k_service = SERVICE_ID_NONE;
                 KeyAttribute->KeyAttributeStatus = EFI_SUCCESS;
         } else {
@@ -470,13 +452,10 @@ do_delete_key_attributes(key_entry_t *entry, EFI_KMS_KEY_ATTRIBUTE *KeyAttribute
 
 static EFI_STATUS EFIAPI
 delete_key_attributes_impl(EFI_KMS_SERVICE *This,
-                           EFI_KMS_CLIENT_INFO *Client __unused,
-                           UINT8 *KeyIdentifierSize,
-                           const VOID *KeyIdentifier,
-                           UINT16 *KeyAttributesCount,
-                           EFI_KMS_KEY_ATTRIBUTE *KeyAttributes,
-                           UINTN *ClientDataSize __unused,
-                           VOID **ClientData __unused)
+    EFI_KMS_CLIENT_INFO *Client __unused, UINT8 *KeyIdentifierSize,
+    const VOID *KeyIdentifier, UINT16 *KeyAttributesCount,
+    EFI_KMS_KEY_ATTRIBUTE *KeyAttributes, UINTN *ClientDataSize __unused,
+    VOID **ClientData __unused)
 {
         UINTN i, j;
 
@@ -491,7 +470,7 @@ delete_key_attributes_impl(EFI_KMS_SERVICE *This,
                    !memcmp(keys[i].k_id, KeyIdentifier, *KeyIdentifierSize)) {
                         for (j = 0; j < *KeyAttributesCount; j++) {
                                 do_delete_key_attributes(keys + i,
-                                                         KeyAttributes + j);
+                                    KeyAttributes + j);
                         }
 
                         return (EFI_SUCCESS);
@@ -502,15 +481,14 @@ delete_key_attributes_impl(EFI_KMS_SERVICE *This,
 }
 
 static EFI_STATUS
-check_match(key_entry_t *entry,
-            EFI_KMS_KEY_ATTRIBUTE *KeyAttribute,
-            bool *match)
+check_match(key_entry_t *entry, EFI_KMS_KEY_ATTRIBUTE *KeyAttribute,
+    bool *match)
 {
         if (KeyAttribute->KeyAttributeIdentifierCount ==
             KEY_ATTR_SERVICE_ID_NAME_LEN &&
             !memcmp(KEY_ATTR_SERVICE_ID_NAME,
-                    KeyAttribute->KeyAttributeIdentifier,
-                    KEY_ATTR_SERVICE_ID_NAME_LEN)) {
+                KeyAttribute->KeyAttributeIdentifier,
+                KEY_ATTR_SERVICE_ID_NAME_LEN)) {
                 *match = (entry->k_service ==
                           *((int*)(KeyAttribute->KeyAttributeValue)));
 
@@ -522,13 +500,10 @@ check_match(key_entry_t *entry,
 
 static EFI_STATUS EFIAPI
 get_key_by_attributes_impl(EFI_KMS_SERVICE *This,
-                           EFI_KMS_CLIENT_INFO *Client __unused,
-                           UINTN *KeyAttributesCount,
-                           EFI_KMS_KEY_ATTRIBUTE *KeyAttributes,
-                           UINTN *KeyDescriptorCount,
-                           EFI_KMS_KEY_DESCRIPTOR *KeyDescriptors,
-                           UINTN *ClientDataSize __unused,
-                           VOID **ClientData __unused)
+    EFI_KMS_CLIENT_INFO *Client __unused, UINTN *KeyAttributesCount,
+    EFI_KMS_KEY_ATTRIBUTE *KeyAttributes, UINTN *KeyDescriptorCount,
+    EFI_KMS_KEY_DESCRIPTOR *KeyDescriptors, UINTN *ClientDataSize __unused,
+    VOID **ClientData __unused)
 {
         EFI_STATUS status;
         UINT8 idxs[MAX_KEYS];
@@ -545,7 +520,8 @@ get_key_by_attributes_impl(EFI_KMS_SERVICE *This,
                 match = true;
 
                 for (j = 0; j < *KeyAttributesCount && match; j++) {
-                        status = check_match(keys + i, KeyAttributes + j, &match);
+                        status = check_match(keys + i, KeyAttributes + j,
+                            &match);
 
                         if (EFI_ERROR(status)) {
                                 return (status);
@@ -577,10 +553,10 @@ get_key_by_attributes_impl(EFI_KMS_SERVICE *This,
         for (i = 0; i < nmatches; i++) {
                 KeyDescriptors[i].KeyIdentifierSize = keys[idxs[i]].k_id_size;
                 KeyDescriptors[i].KeyIdentifier = keys[idxs[i]].k_id;
-                memcpy(&(KeyDescriptors[i].KeyFormat), &(keys[idxs[i]].k_format),
-                       sizeof(EFI_GUID));
+                memcpy(&(KeyDescriptors[i].KeyFormat),
+                    &(keys[idxs[i]].k_format), sizeof(EFI_GUID));
                 status = copy_key(KeyDescriptors[i].KeyValue,
-                                  keys[idxs[i]].k_data, &keys[idxs[i]].k_format);
+                    keys[idxs[i]].k_data, &keys[idxs[i]].k_format);
                 KeyDescriptors[i].KeyStatus = status;
         }
 
@@ -598,7 +574,7 @@ register_kms(void)
 
         if (EFI_ERROR(status)) {
               printf("Could not register kernel KMS (%lu)\n",
-                     EFI_ERROR_CODE(status));
+                  EFI_ERROR_CODE(status));
         }
 }
 
@@ -620,7 +596,7 @@ init(void)
 	if (status == EFI_BUFFER_TOO_SMALL) {
 		handles = (EFI_HANDLE *)malloc(sz);
 		status = BS->LocateHandle(ByProtocol, &EfiKmsProtocolGuid,
-                                          0, &sz, handles);
+                    0, &sz, handles);
 
                 if (status == EFI_NOT_FOUND) {
                         /* No handles found, just register our KMS */
@@ -629,7 +605,7 @@ init(void)
                         return;
                 } else if (EFI_ERROR(status)) {
                         printf("Could not get KMS device handles (%lu)\n",
-                               EFI_ERROR_CODE(status));
+                            EFI_ERROR_CODE(status));
 			free(handles);
 
                         return;
@@ -649,22 +625,22 @@ init(void)
 
 	for (n = 0; n < nin && !found; n++) {
                 status = BS->OpenProtocol(handles[n], &KernelKeyInjectorGuid,
-                                          (void**)&kms, IH, handles[n],
-                                          EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+                    (void**)&kms, IH, handles[n],
+                    EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 
                 if (EFI_ERROR(status)) {
                         printf("Could not open KMS service (%lu)\n",
-                               EFI_ERROR_CODE(status));
+                            EFI_ERROR_CODE(status));
                         return;
                 }
 
                 if (!memcmp(&KernelKeyInjectorGuid, &(kms->ServiceId),
-                            sizeof(EFI_GUID))) {
+                    sizeof(EFI_GUID))) {
                         found = true;
                 }
 
                 BS->CloseProtocol(handles[n], &KernelKeyInjectorGuid,
-                                  IH, handles[n]);
+                    IH, handles[n]);
 	}
 
 	free(handles);

@@ -378,7 +378,7 @@ efipart_hdinfo_add(EFI_HANDLE disk_handle, EFI_HANDLE part_handle)
 
 	STAILQ_FOREACH(hd, &hdinfo, pd_link) {
 		if (efi_devpath_match(hd->pd_devpath, disk_devpath) != 0) {
-			/* Add the partition. */
+                        /* Add the partition. */
 			pd->pd_handle = part_handle;
 			pd->pd_unit = node->PartitionNumber;
 			pd->pd_devpath = part_devpath;

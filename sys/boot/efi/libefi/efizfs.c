@@ -71,6 +71,7 @@ efi_zfs_probe(void)
 
 	BS->HandleProtocol(IH, &imgid, (VOID**)&img);
 	hdi = efiblk_get_pdinfo_list(&efipart_hddev);
+	STAILQ_INIT(&zfsinfo);
 
 	/*
 	 * Find the handle for the boot device. The boot1 did find the

@@ -68,6 +68,9 @@ uint64_t pool_guid;
 #endif
 
 struct fs_ops *file_system[] = {
+#ifdef EFI_ZFS_BOOT
+	&zfs_fsops,
+#endif
 	&dosfs_fsops,
 	&ufs_fsops,
 	&cd9660_fsops,
@@ -135,9 +138,6 @@ efi_readin(int fd __unused, vm_offset_t dest __unused,
 
 static EFI_GUID DevicePathGUID = DEVICE_PATH_PROTOCOL;
 static EFI_GUID LoadedImageGUID = LOADED_IMAGE_PROTOCOL;
-
-static struct devdesc *loaddev;
-static struct fs_ops *loadfs;
 
 /*
  * nodes_match returns TRUE if the imgpath isn't NULL and the nodes match,
@@ -376,49 +376,44 @@ devpath_str(EFI_DEVICE_PATH *devpath)
 static EFI_STATUS
 do_load(const char *filepath, void **bufp, size_t *bufsize)
 {
-        struct open_file f;
-        struct stat st;
+	struct stat st;
         void *buf = NULL;
-        int err;
-        size_t resid, fsize;
+        int fd, err;
+        size_t fsize, remaining;
+        ssize_t readsize;
 
-        f.f_ops = loadfs;
-        f.f_dev = loaddev->d_dev;
-        f.f_devdata = loaddev;
-
-        if ((err = f.f_dev->dv_open(&f, loaddev)) != 0) {
-                return errno_to_efi_status(err);
+        if ((fd = open(filepath, O_RDONLY)) < 0) {
+                return (ENOTSUP);
         }
 
-        if ((err = f.f_ops->fo_open(filepath, &f)) != 0) {
-                goto close_dev;
-        }
-
-        if ((err = f.f_ops->fo_stat(&f, &st)) != 0) {
-                goto close_dev;
+        if ((err = fstat(fd, &st)) != 0) {
+                goto close_file;
         }
 
         fsize = st.st_size;
 
         if ((buf = malloc(fsize)) == NULL) {
                 err = ENOMEM;
-                goto close_dev;
+                goto close_file;
         }
 
-        for (resid = 0; resid < fsize; resid++) {
-                if ((err = f.f_ops->fo_read(&f, (char *)buf + resid,
-                        fsize - resid, &resid)) != 0) {
+        remaining = fsize;
+
+        do {
+                if ((readsize = read(fd, buf, fsize)) < 0) {
+                        err = (-readsize);
                         goto free_buf;
                 }
-        }
 
+                remaining -= readsize;
+        } while(remaining != 0);
+
+        close(fd);
         *bufsize = st.st_size;
         *bufp = buf;
 
  close_file:
-        f.f_ops->fo_close(&f);
- close_dev:
-        f.f_dev->dv_close(&f);
+        close(fd);
 
         return errno_to_efi_status(err);
 
@@ -428,49 +423,36 @@ do_load(const char *filepath, void **bufp, size_t *bufsize)
 }
 
 static int
-probe_fs(struct devdesc *dev, const char *filepath)
+probe_fs(const char *filepath)
 {
-        struct open_file f;
-        int i, err;
+        int fd;
 
-        f.f_dev = dev->d_dev;
-        f.f_devdata = dev;
-
-        if ((err = dev->d_dev->dv_open(&f, dev)) != 0) {
-                return errno_to_efi_status(err);
+        if ((fd = open(filepath, O_RDONLY)) < 0) {
+                return (ENOTSUP);
         }
 
-        for (i = 0; file_system[i] != NULL; i++) {
-                f.f_ops = file_system[i];
-                if ((err = file_system[i]->fo_open(filepath, &f)) == 0) {
-                        file_system[i]->fo_close(&f);
-                        dev->d_dev->dv_close(&f);
-                        loaddev = dev;
-                        loadfs = file_system[i];
+        close(fd);
 
-                        return (0);
-                }
-        }
-
-        dev->d_dev->dv_close(&f);
-
-        return (ENOTSUP);
+        return (0);
 }
 
 static int
 probe_dev(struct devsw *dev, int unit, const char *filepath)
 {
-        struct devdesc *currdev = malloc(sizeof (struct devdesc));
+        struct devdesc currdev;
+        char *devname;
         int err;
 
-	currdev->d_dev = dev;
-	currdev->d_type = currdev->d_dev->dv_type;
-	currdev->d_unit = unit;
-	currdev->d_opendata = NULL;
+	currdev.d_dev = dev;
+	currdev.d_type = currdev.d_dev->dv_type;
+	currdev.d_unit = unit;
+	currdev.d_opendata = NULL;
+        devname = efi_fmtdev(&currdev);
 
-        if ((err = probe_fs(currdev, filepath)) != 0) {
-                free(currdev);
-        }
+        env_setenv("currdev", EV_VOLATILE, devname, efi_setcurrdev,
+            env_nounset);
+
+        err = probe_fs(filepath);
 
         return (err);
 }
@@ -486,43 +468,50 @@ load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
 	struct devsw *dev;
 	int unit;
 	uint64_t extra;
+	char *devname;
 
 #ifdef EFI_ZFS_BOOT
 	/* Did efi_zfs_probe() detect the boot pool? */
 	if (pool_guid != 0) {
-                struct zfs_devdesc *currdev = malloc(sizeof (struct zfs_devdesc));
+                struct zfs_devdesc currdev;
 
-		currdev->d_dev = &zfs_dev;
-		currdev->d_unit = 0;
-		currdev->d_type = currdev->d_dev->dv_type;
-		currdev->d_opendata = NULL;
-		currdev->pool_guid = pool_guid;
-		currdev->root_guid = 0;
+		currdev.d_dev = &zfs_dev;
+		currdev.d_unit = 0;
+		currdev.d_type = currdev.d_dev->dv_type;
+		currdev.d_opendata = NULL;
+		currdev.pool_guid = pool_guid;
+		currdev.root_guid = 0;
+		devname = efi_fmtdev(&currdev);
 
-                if (probe_fs((struct devdesc *)currdev, filepath) == 0 &&
+		env_setenv("currdev", EV_VOLATILE, devname, efi_setcurrdev,
+		    env_nounset);
+
+                if (probe_fs(filepath) == 0 &&
                     do_load(filepath, bufp, bufsize) == EFI_SUCCESS) {
                         *handlep = img->DeviceHandle;
                         return (0);
                 }
-
-                free(currdev);
 	}
 #endif /* EFI_ZFS_BOOT */
 
 	/* We have device lists for hd, cd, fd, walk them all. */
 	pdi_list = efiblk_get_pdinfo_list(&efipart_hddev);
 	STAILQ_FOREACH(dp, pdi_list, pd_link) {
-                struct disk_devdesc *currdev = malloc(sizeof (struct disk_devdesc));
+                struct disk_devdesc currdev;
 
-		currdev->d_dev = &efipart_hddev;
-		currdev->d_type = currdev->d_dev->dv_type;
-		currdev->d_unit = dp->pd_unit;
-		currdev->d_opendata = NULL;
-		currdev->d_slice = -1;
-		currdev->d_partition = -1;
+		currdev.d_dev = &efipart_hddev;
+		currdev.d_type = currdev.d_dev->dv_type;
+		currdev.d_unit = dp->pd_unit;
+		currdev.d_opendata = NULL;
+		currdev.d_slice = -1;
+		currdev.d_partition = -1;
+		devname = efi_fmtdev(&currdev);
+
+		env_setenv("currdev", EV_VOLATILE, devname, efi_setcurrdev,
+		    env_nounset);
 
 	        if (dp->pd_handle == img->DeviceHandle &&
-                    probe_fs((struct devdesc *)currdev, filepath) == 0 &&
+                    probe_fs(filepath) == 0 &&
                     do_load(filepath, bufp, bufsize) == EFI_SUCCESS) {
                         *handlep = img->DeviceHandle;
                         return (0);
@@ -531,11 +520,14 @@ load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
                 /* Assuming GPT partitioning. */
 		STAILQ_FOREACH(pp, &dp->pd_part, pd_link) {
 			if (pp->pd_handle == img->DeviceHandle) {
-				currdev->d_slice = pp->pd_unit;
-				currdev->d_partition = 255;
+				currdev.d_slice = pp->pd_unit;
+				currdev.d_partition = 255;
+                                devname = efi_fmtdev(&currdev);
 
-                                if (probe_fs((struct devdesc *)currdev,
-                                        filepath) == 0 &&
+                                env_setenv("currdev", EV_VOLATILE, devname,
+                                    efi_setcurrdev, env_nounset);
+
+                                if (probe_fs(filepath) == 0 &&
                                     do_load(filepath, bufp, bufsize) ==
                                         EFI_SUCCESS) {
                                         *handlep = img->DeviceHandle;
@@ -543,8 +535,6 @@ load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
                                 }
 			}
 		}
-
-                free(currdev);
 	}
 
 	pdi_list = efiblk_get_pdinfo_list(&efipart_cddev);
@@ -617,43 +607,51 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
 	pdinfo_t *dp, *pp;
 	zfsinfo_list_t *zfsi_list;
 	zfsinfo_t *zi;
+        char *devname;
 
 #ifdef EFI_ZFS_BOOT
 	zfsi_list = efizfs_get_zfsinfo_list();
 	STAILQ_FOREACH(zi, zfsi_list, zi_link) {
-                struct zfs_devdesc *currdev = malloc(sizeof (struct zfs_devdesc));
+                struct zfs_devdesc currdev;
 
-		currdev->d_dev = &zfs_dev;
-		currdev->d_unit = 0;
-		currdev->d_type = currdev->d_dev->dv_type;
-		currdev->d_opendata = NULL;
-		currdev->pool_guid = pool_guid;
-		currdev->root_guid = 0;
+		currdev.d_dev = &zfs_dev;
+		currdev.d_unit = 0;
+		currdev.d_type = currdev.d_dev->dv_type;
+		currdev.d_opendata = NULL;
+		currdev.pool_guid = zi->zi_pool_guid;
+		currdev.root_guid = 0;
+		devname = efi_fmtdev(&currdev);
 
-                if (probe_fs((struct devdesc *)currdev, filepath) == 0 &&
+		env_setenv("currdev", EV_VOLATILE, devname, efi_setcurrdev,
+		    env_nounset);
+
+                if (probe_fs(filepath) == 0 &&
                     do_load(filepath, bufp, bufsize) == EFI_SUCCESS) {
                         *handlep = zi->zi_handle;
+                        printf("Succeeded\n");
 
                         return (0);
                 }
-
-                free(currdev);
 	}
 #endif /* EFI_ZFS_BOOT */
 
 	/* We have device lists for hd, cd, fd, walk them all. */
 	pdi_list = efiblk_get_pdinfo_list(&efipart_hddev);
 	STAILQ_FOREACH(dp, pdi_list, pd_link) {
-                struct disk_devdesc *currdev = malloc(sizeof (struct disk_devdesc));
+                struct disk_devdesc currdev;
 
-		currdev->d_dev = &efipart_hddev;
-		currdev->d_type = currdev->d_dev->dv_type;
-		currdev->d_unit = dp->pd_unit;
-		currdev->d_opendata = NULL;
-		currdev->d_slice = -1;
-		currdev->d_partition = -1;
+		currdev.d_dev = &efipart_hddev;
+		currdev.d_type = currdev.d_dev->dv_type;
+		currdev.d_unit = dp->pd_unit;
+		currdev.d_opendata = NULL;
+		currdev.d_slice = -1;
+		currdev.d_partition = -1;
+		devname = efi_fmtdev(&currdev);
 
-		if (probe_fs((struct devdesc *)currdev, filepath) == 0 &&
+		env_setenv("currdev", EV_VOLATILE, devname, efi_setcurrdev,
+		    env_nounset);
+
+		if (probe_fs(filepath) == 0 &&
                     do_load(filepath, bufp, bufsize) == EFI_SUCCESS) {
                         *handlep = dp->pd_handle;
 
@@ -662,19 +660,20 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
 
                 /* Assuming GPT partitioning. */
 		STAILQ_FOREACH(pp, &dp->pd_part, pd_link) {
-                        currdev->d_slice = pp->pd_unit;
-                        currdev->d_partition = 255;
+                        currdev.d_slice = pp->pd_unit;
+                        currdev.d_partition = 255;
+                        devname = efi_fmtdev(&currdev);
 
-                        if (probe_fs((struct devdesc *)currdev,
-                                filepath) == 0 &&
+                        env_setenv("currdev", EV_VOLATILE, devname,
+                            efi_setcurrdev, env_nounset);
+
+                        if (probe_fs(filepath) == 0 &&
                             do_load(filepath, bufp, bufsize) == EFI_SUCCESS) {
                                 *handlep = pp->pd_handle;
 
                                 return (0);
 			}
 		}
-
-                free(currdev);
 	}
 
 	pdi_list = efiblk_get_pdinfo_list(&efipart_cddev);

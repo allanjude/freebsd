@@ -459,6 +459,27 @@ probe_dev(struct devsw *dev, int unit, const char *filepath)
         return (err);
 }
 
+static size_t
+wcslen(const CHAR16 *s)
+{
+        size_t len;
+
+        for(len = 0; s[len] != '\0'; len++);
+
+        return len;
+}
+
+static void
+efifs_dev_print(EFI_DEVICE_PATH *devpath)
+{
+        CHAR16 *name16;
+
+        name16 = efi_devpath_name(devpath);
+        char buf[wcslen(name16) + 1];
+        cpy16to8(name16, buf, wcslen(name16));
+        printf("%s\n", buf);
+}
+
 static int
 load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
     size_t *bufsize, EFI_HANDLE *handlep)
@@ -624,6 +645,7 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
 		currdev.root_guid = 0;
 		devname = efi_fmtdev(&currdev);
 
+                printf("Probing ZFS device %s\n", devname);
 		env_setenv("currdev", EV_VOLATILE, devname, efi_setcurrdev,
 		    env_nounset);
 
@@ -649,7 +671,9 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
 		currdev.d_slice = -1;
 		currdev.d_partition = -1;
 		devname = efi_fmtdev(&currdev);
+                efifs_dev_print(dp->pd_devpath);
 
+                printf("Probing disk device %s\n", devname);
 		env_setenv("currdev", EV_VOLATILE, devname, efi_setcurrdev,
 		    env_nounset);
 
@@ -665,10 +689,12 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
                         currdev.d_slice = pp->pd_unit;
                         currdev.d_partition = 255;
                         devname = efi_fmtdev(&currdev);
+                        efifs_dev_print(pp->pd_devpath);
 
                         env_setenv("currdev", EV_VOLATILE, devname,
                             efi_setcurrdev, env_nounset);
 
+                        printf("Probing partition device %s\n", devname);
                         if (probe_fs(filepath) == 0 &&
                             do_load(filepath, bufp, bufsize) == EFI_SUCCESS) {
                                 *handlep = pp->pd_handle;

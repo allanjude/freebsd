@@ -351,6 +351,27 @@ efipart_initcd(void)
 	return (0);
 }
 
+static size_t
+wcslen(const CHAR16 *s)
+{
+        size_t len;
+
+        for(len = 0; s[len] != '\0'; len++);
+
+        return len;
+}
+
+static void
+efifs_dev_print(EFI_DEVICE_PATH *devpath)
+{
+        CHAR16 *name16;
+
+        name16 = efi_devpath_name(devpath);
+        char buf[wcslen(name16) + 1];
+        cpy16to8(name16, buf, wcslen(name16));
+        printf("%s\n", buf);
+}
+
 static int
 efipart_hdinfo_add(EFI_HANDLE disk_handle, EFI_HANDLE part_handle)
 {
@@ -378,6 +399,10 @@ efipart_hdinfo_add(EFI_HANDLE disk_handle, EFI_HANDLE part_handle)
 
 	STAILQ_FOREACH(hd, &hdinfo, pd_link) {
 		if (efi_devpath_match(hd->pd_devpath, disk_devpath) != 0) {
+                  /*
+                        printf("Registering partition %p\n", part_handle);
+                        efifs_dev_print(part_devpath);
+                  */
                         /* Add the partition. */
 			pd->pd_handle = part_handle;
 			pd->pd_unit = node->PartitionNumber;
@@ -399,7 +424,10 @@ efipart_hdinfo_add(EFI_HANDLE disk_handle, EFI_HANDLE part_handle)
 	hd->pd_unit = unit;
 	hd->pd_devpath = disk_devpath;
 	STAILQ_INSERT_TAIL(&hdinfo, hd, pd_link);
+        /*
         printf("Registering disk %p\n", disk_handle);
+        efifs_dev_print(disk_devpath);
+        */
 
 	pd = malloc(sizeof(pdinfo_t));
 	if (pd == NULL) {
@@ -414,6 +442,10 @@ efipart_hdinfo_add(EFI_HANDLE disk_handle, EFI_HANDLE part_handle)
 	pd->pd_unit = node->PartitionNumber;
 	pd->pd_devpath = part_devpath;
 	STAILQ_INSERT_TAIL(&hd->pd_part, pd, pd_link);
+        /*
+        printf("Registering partition %p\n", part_handle);
+        efifs_dev_print(part_devpath);
+        */
 
 	return (0);
 }

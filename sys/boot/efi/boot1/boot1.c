@@ -645,7 +645,7 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
 		currdev.root_guid = 0;
 		devname = efi_fmtdev(&currdev);
 
-                //printf("Probing ZFS device %s\n", devname);
+                printf("Probing ZFS device %s\n", devname);
 		env_setenv("currdev", EV_VOLATILE, devname, efi_setcurrdev,
 		    env_nounset);
 
@@ -688,15 +688,16 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
                 /* Assuming GPT partitioning. */
 		STAILQ_FOREACH(pp, &dp->pd_part, pd_link) {
                         currdev.d_slice = pp->pd_unit;
-                        currdev.d_partition = 255;
+                        currdev.d_partition = -1;
                         devname = efi_fmtdev(&currdev);
 
                         env_setenv("currdev", EV_VOLATILE, devname,
                             efi_setcurrdev, env_nounset);
-                        /*
-                        printf("Probing partition device %s\n", devname);
-                        efifs_dev_print(pp->pd_devpath);
-                        */
+
+                        printf("Probing partition device %s (%p)\n",
+                               devname, pp->pd_handle);
+                        //efifs_dev_print(pp->pd_devpath);
+
                         if (probe_fs(filepath) == 0 &&
                             do_load(filepath, bufp, bufsize) == EFI_SUCCESS) {
                                 *handlep = pp->pd_handle;
@@ -705,7 +706,7 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
 			}
 		}
 	}
-
+        /*
 	pdi_list = efiblk_get_pdinfo_list(&efipart_cddev);
 	STAILQ_FOREACH(dp, pdi_list, pd_link) {
 		if (probe_dev(&efipart_cddev, dp->pd_unit, filepath) == 0 &&
@@ -725,7 +726,7 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
                         return (0);
 		}
 	}
-
+        */
 	return (ENOENT);
 }
 

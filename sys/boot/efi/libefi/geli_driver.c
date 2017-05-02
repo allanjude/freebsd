@@ -867,6 +867,7 @@ start_impl(EFI_DRIVER_BINDING *This, EFI_HANDLE handle,
         /* Create device handle and attach interfaces */
         status = BS->InstallMultipleProtocolInterfaces(&newhandle,
             &BlockIOProtocolGUID, newio, &DevicePathGUID, newpath, NULL);
+        printf("Created GELI IO interface %p on device %p\n", newio, newhandle);
 
         if (EFI_ERROR(status)) {
                 printf("Could not create child device %lu\n",

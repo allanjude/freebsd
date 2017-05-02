@@ -412,7 +412,6 @@ efipart_hdinfo_add(EFI_HANDLE disk_handle, EFI_HANDLE part_handle)
                                 return (ENOENT);
 
                         lastnode = efi_devpath_last_node(trimpath);
-                        efifs_dev_print(lastnode);
 
                         if (lastnode == NULL)
                                 return (ENOENT);
@@ -472,6 +471,8 @@ efipart_hdinfo_add(EFI_HANDLE disk_handle, EFI_HANDLE part_handle)
 
                                 if (efi_devpath_match(trimpath,
                                     pp->pd_devpath) != 0) {
+                                  printf("Replaced device handle %p with %p\n",
+                                         pp->pd_handle, part_handle);
                                         pp->pd_handle = part_handle;
                                         pp->pd_devpath = part_devpath;
                                         free(trimpath);
@@ -763,18 +764,6 @@ efipart_print_common(struct devsw *dev, pdinfo_list_t *pdlist, int verbose)
 			pd_dev.d_slice = -1;
 			pd_dev.d_partition = -1;
 			pd_dev.d_opendata = blkio;
-			ret = disk_open(&pd_dev, blkio->Media->BlockSize *
-			    (blkio->Media->LastBlock + 1),
-			    blkio->Media->BlockSize);
-			if (ret == 0) {
-				ret = disk_print(&pd_dev, line, verbose);
-				disk_close(&pd_dev);
-				if (ret != 0)
-					return (ret);
-			} else {
-				/* Do not fail from disk_open() */
-				ret = 0;
-			}
 		} else {
 			if ((ret = pager_output("\n")) != 0)
 				break;
@@ -804,8 +793,8 @@ efipart_printhd(int verbose)
 pdinfo_list_t *
 efiblk_get_pdinfo_list(struct devsw *dev)
 {
-	if (dev->dv_type == DEVT_DISK)
-		return (&hdinfo);
+        if (dev->dv_type == DEVT_DISK)
+                return (&hdinfo);
 	if (dev->dv_type == DEVT_CD)
 		return (&cdinfo);
 	if (dev->dv_type == DEVT_FD)
@@ -814,49 +803,73 @@ efiblk_get_pdinfo_list(struct devsw *dev)
 }
 
 static int
+efipart_lookupdev(struct disk_devdesc *dev, pdinfo_t **pp)
+{
+	pdinfo_list_t *pdi;
+	pdinfo_t *pd;
+
+	if (dev == NULL) {
+		return (EINVAL);
+        }
+
+	pdi = efiblk_get_pdinfo_list(dev->d_dev);
+	if (pdi == NULL) {
+		return (EINVAL);
+        }
+
+	pd = efiblk_get_pdinfo(pdi, dev->d_unit);
+	if (pd == NULL) {
+		return (EIO);
+        }
+
+        /* If we're looking up a specific partition, get the
+         * IO interface from that devide handle.
+         */
+        if (dev->d_slice != -1) {
+                pd = efiblk_get_pdinfo(&pd->pd_part, dev->d_slice);
+        }
+
+        *pp = pd;
+
+        return (0);
+}
+
+static int
 efipart_open(struct open_file *f, ...)
 {
 	va_list args;
 	struct disk_devdesc *dev;
-	pdinfo_list_t *pdi;
 	pdinfo_t *pd;
 	EFI_BLOCK_IO *blkio;
 	EFI_STATUS status;
+        int err;
 
 	va_start(args, f);
 	dev = va_arg(args, struct disk_devdesc*);
 	va_end(args);
-	if (dev == NULL)
-		return (EINVAL);
 
-	pdi = efiblk_get_pdinfo_list(dev->d_dev);
-	if (pdi == NULL)
-		return (EINVAL);
-
-	pd = efiblk_get_pdinfo(pdi, dev->d_unit);
-	if (pd == NULL)
-		return (EIO);
+        if ((err = efipart_lookupdev(dev, &pd)) != 0) {
+                return (err);
+        }
 
 	if (pd->pd_blkio == NULL) {
-		status = BS->HandleProtocol(pd->pd_handle, &blkio_guid,
-		    (void **)&pd->pd_blkio);
-		if (EFI_ERROR(status))
-			return (efi_status_to_errno(status));
+                status = BS->HandleProtocol(pd->pd_handle, &blkio_guid,
+                    (void **)&pd->pd_blkio);
+                if (EFI_ERROR(status))
+                        return (efi_status_to_errno(status));
 	}
 
 	blkio = pd->pd_blkio;
-	if (!blkio->Media->MediaPresent)
+	if (!blkio->Media->MediaPresent) {
 		return (EAGAIN);
+        }
 
 	pd->pd_open++;
 	if (pd->pd_bcache == NULL)
 		pd->pd_bcache = bcache_allocate();
 
-	if (dev->d_dev->dv_type == DEVT_DISK) {
-		return (disk_open(dev,
-		    blkio->Media->BlockSize * (blkio->Media->LastBlock + 1),
-		    blkio->Media->BlockSize));
-	}
+        dev->d_offset = 0;
+
 	return (0);
 }
 
@@ -864,28 +877,20 @@ static int
 efipart_close(struct open_file *f)
 {
 	struct disk_devdesc *dev;
-	pdinfo_list_t *pdi;
 	pdinfo_t *pd;
+        int err;
 
 	dev = (struct disk_devdesc *)(f->f_devdata);
-	if (dev == NULL)
-		return (EINVAL);
-	pdi = efiblk_get_pdinfo_list(dev->d_dev);
-	if (pdi == NULL)
-		return (EINVAL);
-
-	pd = efiblk_get_pdinfo(pdi, dev->d_unit);
-	if (pd == NULL)
-		return (EINVAL);
-
+        if ((err = efipart_lookupdev(dev, &pd)) != 0) {
+                return (err);
+        }
 	pd->pd_open--;
 	if (pd->pd_open == 0) {
 		pd->pd_blkio = NULL;
 		bcache_free(pd->pd_bcache);
 		pd->pd_bcache = NULL;
 	}
-	if (dev->d_dev->dv_type == DEVT_DISK)
-		return (disk_close(dev));
+
 	return (0);
 }
 
@@ -893,26 +898,13 @@ static int
 efipart_ioctl(struct open_file *f, u_long cmd, void *data)
 {
 	struct disk_devdesc *dev;
-	pdinfo_list_t *pdi;
 	pdinfo_t *pd;
-	int rc;
+        int err;
 
 	dev = (struct disk_devdesc *)(f->f_devdata);
-	if (dev == NULL)
-		return (EINVAL);
-	pdi = efiblk_get_pdinfo_list(dev->d_dev);
-	if (pdi == NULL)
-		return (EINVAL);
-
-	pd = efiblk_get_pdinfo(pdi, dev->d_unit);
-	if (pd == NULL)
-		return (EINVAL);
-
-	if (dev->d_dev->dv_type == DEVT_DISK) {
-		rc = disk_ioctl(dev, cmd, data);
-		if (rc != ENOTTY)
-			return (rc);
-	}
+        if ((err = efipart_lookupdev(dev, &pd)) != 0) {
+                return (err);
+        }
 
 	switch (cmd) {
 	case DIOCGSECTORSIZE:
@@ -977,20 +969,13 @@ efipart_strategy(void *devdata, int rw, daddr_t blk, size_t size,
 {
 	struct bcache_devdata bcd;
 	struct disk_devdesc *dev;
-	pdinfo_list_t *pdi;
 	pdinfo_t *pd;
+        int err;
 
 	dev = (struct disk_devdesc *)devdata;
-	if (dev == NULL)
-		return (EINVAL);
-	pdi = efiblk_get_pdinfo_list(dev->d_dev);
-	if (pdi == NULL)
-		return (EINVAL);
-
-	pd = efiblk_get_pdinfo(pdi, dev->d_unit);
-	if (pd == NULL)
-		return (EINVAL);
-
+        if ((err = efipart_lookupdev(dev, &pd)) != 0) {
+                return (err);
+        }
 	if (pd->pd_blkio->Media->RemovableMedia &&
 	    !pd->pd_blkio->Media->MediaPresent)
 		return (EIO);
@@ -1011,7 +996,6 @@ efipart_realstrategy(void *devdata, int rw, daddr_t blk, size_t size,
     char *buf, size_t *rsize)
 {
 	struct disk_devdesc *dev = (struct disk_devdesc *)devdata;
-	pdinfo_list_t *pdi;
 	pdinfo_t *pd;
 	EFI_BLOCK_IO *blkio;
 	uint64_t off, disk_blocks, d_offset = 0;
@@ -1019,16 +1003,12 @@ efipart_realstrategy(void *devdata, int rw, daddr_t blk, size_t size,
 	size_t blkoff, blksz;
 	int error;
 
-	if (dev == NULL || blk < 0)
+	if (blk < 0)
 		return (EINVAL);
 
-	pdi = efiblk_get_pdinfo_list(dev->d_dev);
-	if (pdi == NULL)
-		return (EINVAL);
-
-	pd = efiblk_get_pdinfo(pdi, dev->d_unit);
-	if (pd == NULL)
-		return (EINVAL);
+        if ((error = efipart_lookupdev(dev, &pd)) != 0) {
+                return (error);
+        }
 
 	blkio = pd->pd_blkio;
 	if (blkio == NULL)
@@ -1038,20 +1018,7 @@ efipart_realstrategy(void *devdata, int rw, daddr_t blk, size_t size,
 		return (EIO);
 
 	off = blk * 512;
-	/*
-	 * Get disk blocks, this value is either for whole disk or for
-	 * partition.
-	 */
-	disk_blocks = 0;
-	if (dev->d_dev->dv_type == DEVT_DISK) {
-		if (disk_ioctl(dev, DIOCGMEDIASIZE, &disk_blocks) == 0) {
-			/* DIOCGMEDIASIZE does return bytes. */
-			disk_blocks /= blkio->Media->BlockSize;
-		}
-		d_offset = dev->d_offset;
-	}
-	if (disk_blocks == 0)
-		disk_blocks = blkio->Media->LastBlock + 1 - d_offset;
+        disk_blocks = blkio->Media->LastBlock + 1 - d_offset;
 
 	/* make sure we don't read past disk end */
 	if ((off + size) / blkio->Media->BlockSize > d_offset + disk_blocks) {

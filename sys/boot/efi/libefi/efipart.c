@@ -42,6 +42,7 @@ __FBSDID("$FreeBSD$");
 #include <disk.h>
 
 static EFI_GUID blkio_guid = BLOCK_IO_PROTOCOL;
+static EFI_GUID FreeBSDGELIGUID = FREEBSD_GELI_GUID;
 
 static int efipart_initfd(void);
 static int efipart_initcd(void);
@@ -368,6 +369,7 @@ efifs_dev_print(EFI_DEVICE_PATH *devpath)
 
         name16 = efi_devpath_name(devpath);
         char buf[wcslen(name16) + 1];
+        memset(buf, 0, sizeof buf);
         cpy16to8(name16, buf, wcslen(name16));
         printf("%s\n", buf);
 }
@@ -375,19 +377,55 @@ efifs_dev_print(EFI_DEVICE_PATH *devpath)
 static int
 efipart_hdinfo_add(EFI_HANDLE disk_handle, EFI_HANDLE part_handle)
 {
-	EFI_DEVICE_PATH *disk_devpath, *part_devpath;
+        EFI_DEVICE_PATH *disk_devpath, *part_devpath, *trimpath, *lastnode;
+        VENDOR_DEVICE_PATH *vendornode;
 	HARDDRIVE_DEVICE_PATH *node;
 	int unit;
-	pdinfo_t *hd, *pd, *last;
+	pdinfo_t *hd, *pd, *pp, *last;
 
 	disk_devpath = efi_lookup_devpath(disk_handle);
 	part_devpath = efi_lookup_devpath(part_handle);
+
 	if (disk_devpath == NULL || part_devpath == NULL) {
 		return (ENOENT);
 	}
-	node = (HARDDRIVE_DEVICE_PATH *)efi_devpath_last_node(part_devpath);
+
+        /* Get the disk partition node */
+        lastnode = efi_devpath_last_node(part_devpath);
 	if (node == NULL)
 		return (ENOENT);	/* This should not happen. */
+
+        if (DevicePathType(lastnode) == MEDIA_DEVICE_PATH) {
+                if (DevicePathSubType(lastnode) == MEDIA_VENDOR_DP) {
+                        vendornode = (VENDOR_DEVICE_PATH *)lastnode;
+
+                        /* We only want GELI partitions */
+                        if (memcmp(&(vendornode->Guid), &FreeBSDGELIGUID,
+                            sizeof(EFI_GUID))) {
+                                return (EINVAL);
+                        }
+
+                        /* Trim off the vendor node */
+                        trimpath = efi_devpath_trim(part_devpath);
+
+			if (trimpath == NULL)
+                                return (ENOENT);
+
+                        lastnode = efi_devpath_last_node(trimpath);
+                        efifs_dev_print(lastnode);
+
+                        if (lastnode == NULL)
+                                return (ENOENT);
+
+                        node = (HARDDRIVE_DEVICE_PATH *)lastnode;
+                } else if (DevicePathSubType(lastnode) == MEDIA_HARDDRIVE_DP) {
+                        node = (HARDDRIVE_DEVICE_PATH *)lastnode;
+                }
+                else
+                        return (EINVAL);
+        } else {
+                return (EINVAL);
+        }
 
 	pd = malloc(sizeof(pdinfo_t));
 	if (pd == NULL) {
@@ -399,10 +437,51 @@ efipart_hdinfo_add(EFI_HANDLE disk_handle, EFI_HANDLE part_handle)
 
 	STAILQ_FOREACH(hd, &hdinfo, pd_link) {
 		if (efi_devpath_match(hd->pd_devpath, disk_devpath) != 0) {
-                  /*
-                        printf("Registering partition %p\n", part_handle);
-                        efifs_dev_print(part_devpath);
-                  */
+                        /* Check if there's a related device entry
+                         * already here.
+                         */
+                        STAILQ_FOREACH(pp, &hd->pd_part, pd_link) {
+                                /* If the new device is a subpath of
+                                 * an existing device, then the
+                                 * existing entry subsumes the new
+                                 * one.
+                                 */
+                                trimpath = efi_devpath_trim(pp->pd_devpath);
+
+                                if (trimpath == NULL)
+                                        return (ENOMEM);
+
+                                if (efi_devpath_match(trimpath,
+                                    part_devpath) != 0) {
+                                        free(trimpath);
+                                        free(pd);
+                                        return (EBUSY);
+                                }
+
+                                /* If the existing device path is a
+                                 * subpath of the new one, then the
+                                 * new entry subsumes the existing
+                                 * one.
+                                 */
+                                free(trimpath);
+
+                                trimpath = efi_devpath_trim(part_devpath);
+
+                                if (trimpath == NULL)
+                                        return (ENOMEM);
+
+                                if (efi_devpath_match(trimpath,
+                                    pp->pd_devpath) != 0) {
+                                        pp->pd_handle = part_handle;
+                                        pp->pd_devpath = part_devpath;
+                                        free(trimpath);
+                                        free(pd);
+                                        return (0);
+                                }
+                                free(trimpath);
+
+                        }
+
                         /* Add the partition. */
 			pd->pd_handle = part_handle;
 			pd->pd_unit = node->PartitionNumber;
@@ -424,10 +503,6 @@ efipart_hdinfo_add(EFI_HANDLE disk_handle, EFI_HANDLE part_handle)
 	hd->pd_unit = unit;
 	hd->pd_devpath = disk_devpath;
 	STAILQ_INSERT_TAIL(&hdinfo, hd, pd_link);
-        /*
-        printf("Registering disk %p\n", disk_handle);
-        efifs_dev_print(disk_devpath);
-        */
 
 	pd = malloc(sizeof(pdinfo_t));
 	if (pd == NULL) {
@@ -442,10 +517,6 @@ efipart_hdinfo_add(EFI_HANDLE disk_handle, EFI_HANDLE part_handle)
 	pd->pd_unit = node->PartitionNumber;
 	pd->pd_devpath = part_devpath;
 	STAILQ_INSERT_TAIL(&hd->pd_part, pd, pd_link);
-        /*
-        printf("Registering partition %p\n", part_handle);
-        efifs_dev_print(part_devpath);
-        */
 
 	return (0);
 }
@@ -547,7 +618,6 @@ efipart_updatehd(void)
 		devpath = efi_lookup_devpath(efipart_handles[i]);
 		if (devpath == NULL)
 			continue;
-
 		if ((node = efi_devpath_last_node(devpath)) == NULL)
 			continue;
 		if (efipart_floppy(node) != NULL)
@@ -558,21 +628,47 @@ efipart_updatehd(void)
 		if (EFI_ERROR(status))
 			continue;
 
+                /* Handle GELI volumes */
+                if (DevicePathType(node) == MEDIA_DEVICE_PATH &&
+                    DevicePathSubType(node) == MEDIA_VENDOR_DP) {
+                        VENDOR_DEVICE_PATH *vendornode;
+
+                        vendornode = (VENDOR_DEVICE_PATH *)node;
+
+                        /* We only want GELI partitions */
+                        if (memcmp(&(vendornode->Guid), &FreeBSDGELIGUID,
+                            sizeof(EFI_GUID))) {
+                                continue;
+                        }
+
+                        /* Trim off the vendor node */
+                        devpathcpy = efi_devpath_trim(devpath);
+			if (devpathcpy == NULL)
+				continue;
+                        if ((node = efi_devpath_last_node(devpathcpy)) == NULL)
+                                continue;
+
+                        devpath = devpathcpy;
+                }
+
 		if (DevicePathType(node) == MEDIA_DEVICE_PATH &&
 		    DevicePathSubType(node) == MEDIA_HARDDRIVE_DP) {
 			devpathcpy = efi_devpath_trim(devpath);
 			if (devpathcpy == NULL)
 				continue;
+
 			tmpdevpath = devpathcpy;
 			status = BS->LocateDevicePath(&blkio_guid, &tmpdevpath,
 			    &handle);
 			free(devpathcpy);
 			if (EFI_ERROR(status))
 				continue;
+
 			/*
 			 * We do not support nested partitions.
 			 */
 			devpathcpy = efi_lookup_devpath(handle);
+
 			if (devpathcpy == NULL)
 				continue;
 			if ((node = efi_devpath_last_node(devpathcpy)) == NULL)
@@ -580,6 +676,7 @@ efipart_updatehd(void)
 			if (DevicePathType(node) == MEDIA_DEVICE_PATH &&
 			    DevicePathSubType(node) == MEDIA_HARDDRIVE_DP)
 				continue;
+
 			efipart_hdinfo_add(handle, efipart_handles[i]);
 			continue;
 		}

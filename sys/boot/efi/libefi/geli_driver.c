@@ -64,8 +64,7 @@ static EFI_GUID EfiKmsProtocolGuid = EFI_KMS_PROTOCOL;
 static EFI_GUID KernelKeyInjectorGuid = KERNEL_KEY_INJECTOR_GUID;
 static EFI_GUID Generic512Guid = EFI_KMS_FORMAT_GENERIC_512_GUID;
 static EFI_GUID Generic2048Guid = EFI_KMS_FORMAT_GENERIC_2048_GUID;
-static EFI_GUID FreeBSDGELIGUID =
-  { 0x516e7cbc, 0x6ecf, 0x11d6, {0x8f, 0xf8, 0x00, 0x02, 0x2d, 0x09, 0x71, 0x2b } };
+static EFI_GUID FreeBSDGELIGUID = FREEBSD_GELI_GUID;
 static EFI_DRIVER_BINDING geli_efi_driver;
 static EFI_KMS_SERVICE *kms;
 
@@ -662,8 +661,6 @@ static EFI_STATUS EFIAPI
 write_impl(EFI_BLOCK_IO *This __unused, UINT32 MediaID __unused,
     EFI_LBA LBA __unused, UINTN BufferSize __unused, VOID *Buffer __unused)
 {
-        printf("write_impl(%p, %u, %lu, %lu, %p)\n",
-               This, MediaID, LBA, BufferSize, Buffer);
         return (EFI_UNSUPPORTED);
 }
 
@@ -722,6 +719,28 @@ supported_impl(EFI_DRIVER_BINDING *This, EFI_HANDLE handle,
         return (BS->OpenProtocol(handle, &BlockIOProtocolGUID, NULL,
             This->DriverBindingHandle, handle,
             EFI_OPEN_PROTOCOL_TEST_PROTOCOL));
+}
+
+static size_t
+wcslen(const CHAR16 *s)
+{
+        size_t len;
+
+        for(len = 0; s[len] != '\0'; len++);
+
+        return len;
+}
+
+static void
+efifs_dev_print(EFI_DEVICE_PATH *devpath)
+{
+        CHAR16 *name16;
+
+        name16 = efi_devpath_name(devpath);
+        char buf[wcslen(name16) + 1];
+        memset(buf, 0, sizeof (buf));
+        cpy16to8(name16, buf, wcslen(name16));
+        printf("%s\n", buf);
 }
 
 static EFI_STATUS EFIAPI
@@ -797,7 +816,7 @@ start_impl(EFI_DRIVER_BINDING *This, EFI_HANDLE handle,
                 newcurr = NextDevicePathNode(newcurr);
         }
 
-        vendornode = (VENDOR_DEVICE_PATH*)newcurr;
+        vendornode = (VENDOR_DEVICE_PATH *)newcurr;
         vendornode->Header.Type = MEDIA_DEVICE_PATH;
         vendornode->Header.SubType = MEDIA_VENDOR_DP;
         vendornode->Header.Length[0] = sizeof(VENDOR_DEVICE_PATH);
@@ -848,8 +867,6 @@ start_impl(EFI_DRIVER_BINDING *This, EFI_HANDLE handle,
         /* Create device handle and attach interfaces */
         status = BS->InstallMultipleProtocolInterfaces(&newhandle,
             &BlockIOProtocolGUID, newio, &DevicePathGUID, newpath, NULL);
-
-        printf("Created GELI device %p\n", newhandle);
 
         if (EFI_ERROR(status)) {
                 printf("Could not create child device %lu\n",

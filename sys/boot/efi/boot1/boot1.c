@@ -645,7 +645,7 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
 		currdev.root_guid = 0;
 		devname = efi_fmtdev(&currdev);
 
-                printf("Probing ZFS device %s\n", devname);
+                //printf("Probing ZFS device %s\n", devname);
 		env_setenv("currdev", EV_VOLATILE, devname, efi_setcurrdev,
 		    env_nounset);
 
@@ -671,9 +671,10 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
 		currdev.d_slice = -1;
 		currdev.d_partition = -1;
 		devname = efi_fmtdev(&currdev);
+                /*
                 efifs_dev_print(dp->pd_devpath);
-
                 printf("Probing disk device %s\n", devname);
+                */
 		env_setenv("currdev", EV_VOLATILE, devname, efi_setcurrdev,
 		    env_nounset);
 
@@ -689,12 +690,13 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
                         currdev.d_slice = pp->pd_unit;
                         currdev.d_partition = 255;
                         devname = efi_fmtdev(&currdev);
-                        efifs_dev_print(pp->pd_devpath);
 
                         env_setenv("currdev", EV_VOLATILE, devname,
                             efi_setcurrdev, env_nounset);
-
+                        /*
                         printf("Probing partition device %s\n", devname);
+                        efifs_dev_print(pp->pd_devpath);
+                        */
                         if (probe_fs(filepath) == 0 &&
                             do_load(filepath, bufp, bufsize) == EFI_SUCCESS) {
                                 *handlep = pp->pd_handle;
@@ -769,13 +771,13 @@ try_boot(void)
 	EFI_STATUS status;
         EFI_DEVICE_PATH *fspath;
 
-        printf("Starting boot process\n");
 	status = load_loader(&fshandle, &loaderbuf, &loadersize);
-        printf("Got loader, setting up to boot\n");
 
         if (status != EFI_SUCCESS) {
                 return (status);
         }
+
+        printf("Got loader, setting up to boot\n");
 
 	fspath = NULL;
 	if (status == EFI_SUCCESS) {

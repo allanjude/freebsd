@@ -459,27 +459,6 @@ probe_dev(struct devsw *dev, int unit, const char *filepath)
         return (err);
 }
 
-static size_t
-wcslen(const CHAR16 *s)
-{
-        size_t len;
-
-        for(len = 0; s[len] != '\0'; len++);
-
-        return len;
-}
-
-static void
-efifs_dev_print(EFI_DEVICE_PATH *devpath)
-{
-        CHAR16 *name16;
-
-        name16 = efi_devpath_name(devpath);
-        char buf[wcslen(name16) + 1];
-        cpy16to8(name16, buf, wcslen(name16));
-        printf("%s\n", buf);
-}
-
 static int
 load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
     size_t *bufsize, EFI_HANDLE *handlep)
@@ -505,7 +484,6 @@ load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
 		currdev.pool_guid = pool_guid;
 		currdev.root_guid = 0;
 		devname = efi_fmtdev(&currdev);
-
 		env_setenv("currdev", EV_VOLATILE, devname, efi_setcurrdev,
 		    env_nounset);
 
@@ -529,7 +507,6 @@ load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
 		currdev.d_slice = -1;
 		currdev.d_partition = -1;
 		devname = efi_fmtdev(&currdev);
-
 		env_setenv("currdev", EV_VOLATILE, devname, efi_setcurrdev,
 		    env_nounset);
 
@@ -546,7 +523,6 @@ load_preferred(EFI_LOADED_IMAGE *img, const char *filepath, void **bufp,
 				currdev.d_slice = pp->pd_unit;
 				currdev.d_partition = 255;
                                 devname = efi_fmtdev(&currdev);
-
                                 env_setenv("currdev", EV_VOLATILE, devname,
                                     efi_setcurrdev, env_nounset);
 
@@ -644,15 +620,12 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
 		currdev.pool_guid = zi->zi_pool_guid;
 		currdev.root_guid = 0;
 		devname = efi_fmtdev(&currdev);
-
-                printf("Probing ZFS device %s\n", devname);
 		env_setenv("currdev", EV_VOLATILE, devname, efi_setcurrdev,
 		    env_nounset);
 
                 if (probe_fs(filepath) == 0 &&
                     do_load(filepath, bufp, bufsize) == EFI_SUCCESS) {
                         *handlep = zi->zi_handle;
-                        printf("Succeeded\n");
 
                         return (0);
                 }
@@ -671,10 +644,6 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
 		currdev.d_slice = -1;
 		currdev.d_partition = -1;
 		devname = efi_fmtdev(&currdev);
-                /*
-                efifs_dev_print(dp->pd_devpath);
-                printf("Probing disk device %s\n", devname);
-                */
 		env_setenv("currdev", EV_VOLATILE, devname, efi_setcurrdev,
 		    env_nounset);
 
@@ -694,10 +663,6 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
                         env_setenv("currdev", EV_VOLATILE, devname,
                             efi_setcurrdev, env_nounset);
 
-                        printf("Probing partition device %s (%p)\n",
-                               devname, pp->pd_handle);
-                        //efifs_dev_print(pp->pd_devpath);
-
                         if (probe_fs(filepath) == 0 &&
                             do_load(filepath, bufp, bufsize) == EFI_SUCCESS) {
                                 *handlep = pp->pd_handle;
@@ -706,7 +671,7 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
 			}
 		}
 	}
-        /*
+
 	pdi_list = efiblk_get_pdinfo_list(&efipart_cddev);
 	STAILQ_FOREACH(dp, pdi_list, pd_link) {
 		if (probe_dev(&efipart_cddev, dp->pd_unit, filepath) == 0 &&
@@ -726,7 +691,7 @@ load_all(const char *filepath, void **bufp, size_t *bufsize,
                         return (0);
 		}
 	}
-        */
+
 	return (ENOENT);
 }
 
@@ -778,8 +743,6 @@ try_boot(void)
                 return (status);
         }
 
-        printf("Got loader, setting up to boot\n");
-
 	fspath = NULL;
 	if (status == EFI_SUCCESS) {
 		status = BS->OpenProtocol(fshandle, &DevicePathGUID,
@@ -801,7 +764,6 @@ try_boot(void)
 	 * loading the actual kernel sort all that out. Since these files are
 	 * optional, we don't report errors in trying to read them.
 	 */
-        printf("Loading config files\n");
 	cmd = NULL;
 	cmdsize = 0;
 	status = do_load(PATH_DOTCONFIG, &buf, &bufsize);
@@ -818,7 +780,6 @@ try_boot(void)
 		buf = NULL;
 	}
 
-        printf("Preparing image\n");
 	if ((status = BS->LoadImage(TRUE, IH, devpath_last(fspath),
 	    loaderbuf, loadersize, &loaderhandle)) != EFI_SUCCESS) {
 		printf("Failed to load image, size: %zu, (%lu)\n",
@@ -853,7 +814,6 @@ try_boot(void)
 	DSTALL(1000000);
 	DPRINTF(".\n");
 
-        printf("Booting\n");
 	if ((status = BS->StartImage(loaderhandle, NULL, NULL)) !=
 	    EFI_SUCCESS) {
 		printf("Failed to start image (%lu)\n",
@@ -943,7 +903,6 @@ main(int argc __unused, CHAR16 *argv[] __unused)
 			(devsw[i]->dv_init)();
                 }
         }
-        printf("\nDone\n");
 
 	putchar('\n');
 

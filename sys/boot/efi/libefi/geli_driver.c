@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2016 Eric McCorkle
+ * Copyright (c) 2017 Eric McCorkle
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -276,7 +276,7 @@ try_password(struct g_eli_metadata *md, struct g_eli_softc *sc,
 		    sizeof(md->md_salt), passphrase,
 		    md->md_iterations);
 		g_eli_crypto_hmac_update(&ctx, dkey, sizeof(dkey));
-		bzero(&dkey, sizeof(dkey));
+		explicit_bzero(&dkey, sizeof(dkey));
 	}
 
 	g_eli_crypto_hmac_final(&ctx, key, 0);
@@ -586,7 +586,7 @@ discover(struct g_eli_metadata *md, struct g_eli_softc *sc, EFI_BLOCK_IO *inner,
         }
 
         eli_metadata_softc(sc, md, inner->Media->BlockSize,
-            (inner->Media->LastBlock + inner->Media->BlockSize) *
+            (inner->Media->LastBlock * inner->Media->BlockSize) +
             inner->Media->BlockSize);
 
         return (EFI_SUCCESS);
@@ -609,14 +609,11 @@ read_impl(EFI_BLOCK_IO *This, UINT32 MediaID, EFI_LBA LBA,
         geli_info_t *info = (geli_info_t*)(This + 1);
 	char iv[G_ELI_IVKEYLEN];
 	char *pbuf = Buffer;
-	off_t os;
+	off_t offset;
 	uint64_t keyno;
 	size_t n, nb;
 	struct g_eli_key gkey;
         EFI_STATUS status;
-
-        printf("read_impl(%p, %u, %lu, %lu, %p)\n",
-               This, MediaID, LBA, BufferSize, Buffer);
 
         // Read the raw data
         status = info->blkio->ReadBlocks(info->blkio,
@@ -631,13 +628,15 @@ read_impl(EFI_BLOCK_IO *This, UINT32 MediaID, EFI_LBA LBA,
 	nb = BufferSize / info->blkio->Media->BlockSize;
 
 	for (n = 0; n < nb; n++) {
-                os = (LBA + n) * info->blkio->Media->BlockSize;
+                offset = (LBA + n) * info->blkio->Media->BlockSize;
                 pbuf = (char*)Buffer + (n * info->blkio->Media->BlockSize);
 
-		g_eli_crypto_ivgen(&(info->sc), os, iv, G_ELI_IVKEYLEN);
+		g_eli_crypto_ivgen(&(info->sc), offset, iv, G_ELI_IVKEYLEN);
 
 		/* Get the key that corresponds to this offset */
-		keyno = (os >> G_ELI_KEY_SHIFT) / info->blkio->Media->BlockSize;
+		keyno = (offset >> G_ELI_KEY_SHIFT) /
+                    info->blkio->Media->BlockSize;
+
 		g_eli_key_fill(&(info->sc), &gkey, keyno);
 
 		status = decrypt(info->sc.sc_ealgo, pbuf,
@@ -647,12 +646,12 @@ read_impl(EFI_BLOCK_IO *This, UINT32 MediaID, EFI_LBA LBA,
 		if (status != EFI_SUCCESS) {
                         printf("Error decrypting blocks %lu\n",
                             EFI_ERROR_CODE(status));
-			bzero(&gkey, sizeof(gkey));
+			explicit_bzero(&gkey, sizeof(gkey));
 			return (status);
                 }
         }
 
-	bzero(&gkey, sizeof(gkey));
+	explicit_bzero(&gkey, sizeof(gkey));
 
 	return (EFI_SUCCESS);
 }

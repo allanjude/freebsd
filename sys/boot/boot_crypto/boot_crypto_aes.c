@@ -34,7 +34,7 @@
 
 static int
 aes_xts_ctxinit(symmetric_alg_ctx_t *ptr, int enc __unused,
-                u_char *key, size_t keylen, u_char *iv)
+    const u_char *key, size_t keylen, u_char *iv)
 {
         struct aes_xts_ctx *ctx = &ptr->aes_xts;
         u_int64_t blocknum;
@@ -60,7 +60,7 @@ aes_xts_ctxinit(symmetric_alg_ctx_t *ptr, int enc __unused,
 }
 
 static int
-aes_xts_decrypt(symmetric_alg_ctx_t *ptr, u_char *data, size_t len)
+aes_xts_decrypt_block(symmetric_alg_ctx_t *ptr, u_char *data)
 {
         struct aes_xts_ctx *ctx = &ptr->aes_xts;
 	u_int8_t block[AES_XTS_BLOCKSIZE];
@@ -89,7 +89,17 @@ aes_xts_decrypt(symmetric_alg_ctx_t *ptr, u_char *data, size_t len)
 }
 
 static int
-aes_xts_encrypt(symmetric_alg_ctx_t *ptr, u_char *data, size_t len)
+aes_xts_decrypt(symmetric_alg_ctx_t *ctx, u_char *data, size_t len)
+{
+        u_int i;
+
+        for (i = 0; i < len; i += AES_XTS_BLOCKSIZE) {
+                aes_xts_decrypt_block(ctx, data + i);
+        }
+}
+
+static int
+aes_xts_encrypt_block(symmetric_alg_ctx_t *ptr, u_char *data)
 {
         struct aes_xts_ctx *ctx = &ptr->aes_xts;
 	u_int8_t block[AES_XTS_BLOCKSIZE];
@@ -118,8 +128,18 @@ aes_xts_encrypt(symmetric_alg_ctx_t *ptr, u_char *data, size_t len)
 }
 
 static int
-aes_cbc_ctxinit(symmetric_alg_ctx_t *ptr, int enc, u_char *key,
-                size_t keylen, u_char *iv)
+aes_xts_encrypt(symmetric_alg_ctx_t *ctx, u_char *data, size_t len)
+{
+        u_int i;
+
+        for (i = 0; i < len; i += AES_XTS_BLOCKSIZE) {
+                aes_xts_encrypt_block(ctx, data + i);
+        }
+}
+
+static int
+aes_cbc_ctxinit(symmetric_alg_ctx_t *ptr, int enc, const u_char *key,
+    size_t keylen, u_char *iv)
 {
         struct aes_cbc_ctx *ctx = &ptr->aes_cbc;
 	int err;

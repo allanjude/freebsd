@@ -597,8 +597,6 @@ reset_impl(EFI_BLOCK_IO *This, BOOLEAN ev)
 {
         geli_info_t *info = (geli_info_t*)(This + 1);
 
-        printf("reset_impl\n");
-
         return info->blkio->Reset(info->blkio, ev);
 }
 
@@ -718,28 +716,6 @@ supported_impl(EFI_DRIVER_BINDING *This, EFI_HANDLE handle,
         return (BS->OpenProtocol(handle, &BlockIOProtocolGUID, NULL,
             This->DriverBindingHandle, handle,
             EFI_OPEN_PROTOCOL_TEST_PROTOCOL));
-}
-
-static size_t
-wcslen(const CHAR16 *s)
-{
-        size_t len;
-
-        for(len = 0; s[len] != '\0'; len++);
-
-        return len;
-}
-
-static void
-efifs_dev_print(EFI_DEVICE_PATH *devpath)
-{
-        CHAR16 *name16;
-
-        name16 = efi_devpath_name(devpath);
-        char buf[wcslen(name16) + 1];
-        memset(buf, 0, sizeof (buf));
-        cpy16to8(name16, buf, wcslen(name16));
-        printf("%s\n", buf);
 }
 
 static EFI_STATUS EFIAPI
@@ -866,7 +842,6 @@ start_impl(EFI_DRIVER_BINDING *This, EFI_HANDLE handle,
         /* Create device handle and attach interfaces */
         status = BS->InstallMultipleProtocolInterfaces(&newhandle,
             &BlockIOProtocolGUID, newio, &DevicePathGUID, newpath, NULL);
-        printf("Created GELI IO interface %p on device %p\n", newio, newhandle);
 
         if (EFI_ERROR(status)) {
                 printf("Could not create child device %lu\n",

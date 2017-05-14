@@ -471,8 +471,6 @@ efipart_hdinfo_add(EFI_HANDLE disk_handle, EFI_HANDLE part_handle)
 
                                 if (efi_devpath_match(trimpath,
                                     pp->pd_devpath) != 0) {
-                                  printf("Replaced device handle %p with %p\n",
-                                         pp->pd_handle, part_handle);
                                         pp->pd_handle = part_handle;
                                         pp->pd_devpath = part_devpath;
                                         free(trimpath);

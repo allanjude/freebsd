@@ -623,22 +623,23 @@ read_impl(EFI_BLOCK_IO *This, UINT32 MediaID, EFI_LBA LBA,
                 return (status);
         }
 
-	nb = BufferSize / info->blkio->Media->BlockSize;
+	nb = BufferSize / info->sc.sc_sectorsize;
 
 	for (n = 0; n < nb; n++) {
-                offset = (LBA + n) * info->blkio->Media->BlockSize;
-                pbuf = (char*)Buffer + (n * info->blkio->Media->BlockSize);
+                offset = (LBA * info->blkio->Media->BlockSize) +
+		    (n * info->sc.sc_sectorsize);
+                pbuf = (char*)Buffer + (n * info->sc.sc_sectorsize);
 
 		g_eli_crypto_ivgen(&(info->sc), offset, iv, G_ELI_IVKEYLEN);
 
 		/* Get the key that corresponds to this offset */
 		keyno = (offset >> G_ELI_KEY_SHIFT) /
-                    info->blkio->Media->BlockSize;
+                    info->sc.sc_sectorsize;
 
 		g_eli_key_fill(&(info->sc), &gkey, keyno);
 
 		status = decrypt(info->sc.sc_ealgo, pbuf,
-		    info->blkio->Media->BlockSize, gkey.gek_key,
+		    info->sc.sc_sectorsize, gkey.gek_key,
                     info->sc.sc_ekeylen, iv);
 
 		if (status != EFI_SUCCESS) {

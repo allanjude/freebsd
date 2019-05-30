@@ -90,6 +90,31 @@ SRCS+= uuid_create_nil.c uuid_equal.c uuid_from_string.c uuid_is_nil.c uuid_to_s
 .PATH: ${SASRC}/${LIBSA_CPUARCH}
 SRCS+=	_setjmp.S
 
+# decompression functionality from libzstd
+.PATH: ${SRCTOP}/sys/contrib/zstd/lib
+CFLAGS+= -I${SRCTOP}/sys/contrib/zstd/lib
+.PATH: ${SRCTOP}/sys/contrib/zstd/lib/common
+CFLAGS+= -I${SRCTOP}/sys/contrib/zstd/lib/common
+.PATH: ${SRCTOP}/sys/contrib/zstd/lib/compress
+CFLAGS+= -I${SRCTOP}/sys/contrib/zstd/lib/compress
+.PATH: ${SRCTOP}/sys/contrib/zstd/lib/decompress
+CFLAGS+= -I${SRCTOP}/sys/contrib/zstd/lib/decompress
+.for file in zstd_common.c fse_decompress.c entropy_common.c error_private.c \
+	xxhash.c zstd_compress.c fse_compress.c huf_compress.c \
+	zstd_double_fast.c zstd_fast.c zstd_lazy.c zstd_ldm.c zstd_opt.c \
+	zstd_decompress.c huf_decompress.c
+SRCS+=	_${file}
+CLEANFILES+=	_${file}
+
+_${file}: ${file}
+	sed -e 's|<stddef.h>|"stand.h"|' \
+	    -e 's|<string.h>|"stand.h"|' \
+	    -e 's|<stdio.h>|"stand.h"|' \
+	    -e 's|<stdlib.h>|"stand.h"|' \
+	    -e 's|<stdint.h>|"stand.h"|' \
+	    ${.ALLSRC} > ${.TARGET}
+.endfor
+
 # decompression functionality from libbz2
 # NOTE: to actually test this functionality after libbz2 upgrade compile
 # loader(8) with LOADER_BZIP2_SUPPORT defined

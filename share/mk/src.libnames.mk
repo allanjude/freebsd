@@ -359,9 +359,9 @@ _DP_ulog=	md
 _DP_fifolog=	z
 _DP_ipf=	kvm
 _DP_zfs=	md pthread umem util uutil m nvpair avl bsdxml geom nvpair z \
-		zfs_core
+		zfs_core zstd
 _DP_zfs_core=	nvpair
-_DP_zpool=	md pthread z nvpair avl umem
+_DP_zpool=	md pthread z nvpair avl umem zstd
 _DP_be=		zfs nvpair
 
 # OFED support

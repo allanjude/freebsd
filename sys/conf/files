@@ -640,25 +640,25 @@ contrib/xz-embedded/linux/lib/xz/xz_dec_lzma2.c	optional xz \
 contrib/xz-embedded/linux/lib/xz/xz_dec_stream.c optional xz \
 	compile-with "${NORMAL_C} -I$S/contrib/xz-embedded/freebsd/ -I$S/contrib/xz-embedded/linux/lib/xz/ -I$S/contrib/xz-embedded/linux/include/linux/"
 # Zstd
-contrib/zstd/lib/freebsd/zstd_kmalloc.c		optional zstdio compile-with ${ZSTD_C}
-contrib/zstd/lib/common/zstd_common.c		optional zstdio compile-with ${ZSTD_C}
-contrib/zstd/lib/common/fse_decompress.c	optional zstdio compile-with ${ZSTD_C}
-contrib/zstd/lib/common/entropy_common.c	optional zstdio compile-with ${ZSTD_C}
-contrib/zstd/lib/common/error_private.c		optional zstdio compile-with ${ZSTD_C}
-contrib/zstd/lib/common/xxhash.c		optional zstdio compile-with ${ZSTD_C}
-contrib/zstd/lib/compress/zstd_compress.c	optional zstdio compile-with ${ZSTD_C}
-contrib/zstd/lib/compress/fse_compress.c	optional zstdio compile-with ${ZSTD_C}
-contrib/zstd/lib/compress/hist.c		optional zstdio compile-with ${ZSTD_C}
-contrib/zstd/lib/compress/huf_compress.c	optional zstdio compile-with ${ZSTD_C}
-contrib/zstd/lib/compress/zstd_double_fast.c	optional zstdio compile-with ${ZSTD_C}
-contrib/zstd/lib/compress/zstd_fast.c		optional zstdio compile-with ${ZSTD_C}
-contrib/zstd/lib/compress/zstd_lazy.c		optional zstdio compile-with ${ZSTD_C}
-contrib/zstd/lib/compress/zstd_ldm.c		optional zstdio compile-with ${ZSTD_C}
-contrib/zstd/lib/compress/zstd_opt.c		optional zstdio compile-with ${ZSTD_C}
-contrib/zstd/lib/decompress/zstd_ddict.c	optional zstdio compile-with ${ZSTD_C}
-contrib/zstd/lib/decompress/zstd_decompress.c	optional zstdio compile-with ${ZSTD_C}
-contrib/zstd/lib/decompress/zstd_decompress_block.c	optional zstdio compile-with ${ZSTD_C}
-contrib/zstd/lib/decompress/huf_decompress.c	optional zstdio compile-with ${ZSTD_C}
+contrib/zstd/lib/freebsd/zstd_kmalloc.c		optional zstdio | zfs compile-with ${ZSTD_C}
+contrib/zstd/lib/common/zstd_common.c		optional zstdio | zfs compile-with ${ZSTD_C}
+contrib/zstd/lib/common/fse_decompress.c	optional zstdio | zfs compile-with ${ZSTD_C}
+contrib/zstd/lib/common/entropy_common.c	optional zstdio | zfs compile-with ${ZSTD_C}
+contrib/zstd/lib/common/error_private.c		optional zstdio | zfs compile-with ${ZSTD_C}
+contrib/zstd/lib/common/xxhash.c		optional zstdio | zfs compile-with ${ZSTD_C}
+contrib/zstd/lib/compress/zstd_compress.c	optional zstdio | zfs compile-with ${ZSTD_C}
+contrib/zstd/lib/compress/fse_compress.c	optional zstdio | zfs compile-with ${ZSTD_C}
+contrib/zstd/lib/compress/hist.c		optional zstdio | zfs compile-with ${ZSTD_C}
+contrib/zstd/lib/compress/huf_compress.c	optional zstdio | zfs compile-with ${ZSTD_C}
+contrib/zstd/lib/compress/zstd_double_fast.c	optional zstdio | zfs compile-with ${ZSTD_C}
+contrib/zstd/lib/compress/zstd_fast.c		optional zstdio | zfs compile-with ${ZSTD_C}
+contrib/zstd/lib/compress/zstd_lazy.c		optional zstdio | zfs compile-with ${ZSTD_C}
+contrib/zstd/lib/compress/zstd_ldm.c		optional zstdio | zfs compile-with ${ZSTD_C}
+contrib/zstd/lib/compress/zstd_opt.c		optional zstdio | zfs compile-with ${ZSTD_C}
+contrib/zstd/lib/decompress/zstd_ddict.c	optional zstdio | zfs compile-with ${ZSTD_C}
+contrib/zstd/lib/decompress/zstd_decompress.c	optional zstdio | zfs compile-with ${ZSTD_C}
+contrib/zstd/lib/decompress/zstd_decompress_block.c	optional zstdio | zfs compile-with ${ZSTD_C}
+contrib/zstd/lib/decompress/huf_decompress.c	optional zstdio | zfs compile-with ${ZSTD_C}
 # Blake 2
 contrib/libb2/blake2b-ref.c	optional crypto | ipsec | ipsec_support \
 	compile-with "${NORMAL_C} -I$S/crypto/blake2 -Wno-cast-qual -DSUFFIX=_ref -Wno-unused-function"

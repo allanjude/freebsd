@@ -4891,9 +4891,9 @@ zdb_read_block(char *thing, spa_t *spa)
 		    lsize -= SPA_MINBLOCKSIZE) {
 			for (c = 0; c < ZIO_COMPRESS_FUNCTIONS; c++) {
 				if (zio_decompress_data(c, pabd,
-				    lbuf, psize, lsize) == 0 &&
+				    lbuf, psize, lsize, NULL) == 0 &&
 				    zio_decompress_data_buf(c, pbuf2,
-				    lbuf2, psize, lsize) == 0 &&
+				    lbuf2, psize, lsize, NULL) == 0 &&
 				    bcmp(lbuf, lbuf2, lsize) == 0)
 					break;
 			}

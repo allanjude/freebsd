@@ -70,6 +70,18 @@ Malloc(size_t len, const char *file __unused, int line __unused)
 	return (NULL);
 }
 
+void *
+Calloc(size_t number, size_t len, const char *file __unused, int line __unused)
+{
+	uintptr_t bytes = (uintptr_t)number * (uintptr_t)len;
+	void *out;
+
+	if ((out = Malloc(bytes, file, line)) != NULL)
+		bzero(out, bytes);
+
+	return(out);
+}
+
 void
 Free(void *buf, const char *file __unused, int line __unused)
 {

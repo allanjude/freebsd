@@ -124,6 +124,7 @@ enum zio_checksum {
 #define	BOOTFS_COMPRESS_VALID(compress)			\
 	((compress) == ZIO_COMPRESS_LZJB ||		\
 	(compress) == ZIO_COMPRESS_LZ4 ||		\
+	(compress) == ZIO_COMPRESS_ZSTD ||		\
 	(compress) == ZIO_COMPRESS_ON ||		\
 	(compress) == ZIO_COMPRESS_OFF)
 
@@ -295,6 +296,7 @@ typedef struct zbookmark_phys {
 typedef struct zio_prop {
 	enum zio_checksum	zp_checksum;
 	enum zio_compress	zp_compress;
+	int32_t			zp_complevel;
 	dmu_object_type_t	zp_type;
 	uint8_t			zp_level;
 	uint8_t			zp_copies;
@@ -605,6 +607,8 @@ extern enum zio_checksum zio_checksum_dedup_select(spa_t *spa,
     enum zio_checksum child, enum zio_checksum parent);
 extern enum zio_compress zio_compress_select(spa_t *spa,
     enum zio_compress child, enum zio_compress parent);
+extern int32_t zio_complevel_select(spa_t *spa, int32_t child,
+    int32_t parent);
 
 extern void zio_suspend(spa_t *spa, zio_t *zio);
 extern int zio_resume(spa_t *spa);

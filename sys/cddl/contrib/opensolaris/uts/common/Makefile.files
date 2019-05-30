@@ -154,6 +154,7 @@ ZFS_COMMON_OBJS +=		\
 	zio_inject.o		\
 	zle.o			\
 	zrlock.o		\
+	zstd.o			\
 	zthr.o
 
 ZFS_SHARED_OBJS +=		\

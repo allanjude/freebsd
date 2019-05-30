@@ -167,6 +167,7 @@ typedef enum {
 	ZFS_PROP_PREV_SNAP,
 	ZFS_PROP_RECEIVE_RESUME_TOKEN,
 	ZFS_PROP_REMAPTXG,		/* not exposed to the user */
+	ZFS_PROP_ZSTD_LEVEL,		/* not exposed to the user */
 	ZFS_NUM_PROPS
 } zfs_prop_t;
 

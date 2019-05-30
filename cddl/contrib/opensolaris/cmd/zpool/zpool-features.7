@@ -608,6 +608,52 @@ and will return to being
 once all filesystems that have ever had their checksum set to
 .Sy skein
 are destroyed.
+.It Sy zstd_compress
+.Bl -column "READ\-ONLY COMPATIBLE" "org.freebsd:zstd_compress"
+.It GUID Ta org.freebsd:zstd_compress
+.It READ\-ONLY COMPATIBLE Ta no
+.It DEPENDENCIES Ta none
+.El
+.Pp
+.Sy zstd
+is a high-performance compression algorithm that features a combination
+of high compression ratios and high speed.
+Compared to
+.Sy gzip ,
+.Sy zstd
+offers slighty better compression at much higher speeds.
+Compared to
+.Sy lz4 ,
+.Sy zstd
+offers much better compression while being only modestly slower.
+Typically,
+.Sy zstd
+compression speed is approximately 250 megabytes/second/thread, and
+decompression speed is 1 gigabyte/second/thread.
+Booting off of
+.Sy zstd Ns
+-compressed root pools is supported.
+.Pp
+When the
+.Sy zstd
+feature is set to
+.Sy enabled ,
+the administrator can turn on
+.Sy zstd
+compression of any dataset using the
+.Dl # zfs set compress=zstd Ar dataset
+command.
+This feature becomes
+.Sy active
+once a
+.Sy compress
+property has been set to
+.Sy zstd ,
+and will return to being
+.Sy enabled
+once all filesystems that have ever had their compress property set to
+.Sy zstd
+are destroyed.
 .El
 .Sh SEE ALSO
 .Xr zpool 8

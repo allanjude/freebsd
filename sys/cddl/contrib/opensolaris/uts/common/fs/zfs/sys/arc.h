@@ -219,14 +219,16 @@ void arc_space_consume(uint64_t space, arc_space_type_t type);
 void arc_space_return(uint64_t space, arc_space_type_t type);
 boolean_t arc_is_metadata(arc_buf_t *buf);
 enum zio_compress arc_get_compression(arc_buf_t *buf);
+int arc_get_complevel(arc_buf_t *buf);
 int arc_decompress(arc_buf_t *buf);
 arc_buf_t *arc_alloc_buf(spa_t *spa, void *tag, arc_buf_contents_t type,
     int32_t size);
 arc_buf_t *arc_alloc_compressed_buf(spa_t *spa, void *tag,
-    uint64_t psize, uint64_t lsize, enum zio_compress compression_type);
+    uint64_t psize, uint64_t lsize, enum zio_compress compression_type,
+    int32_t complevel);
 arc_buf_t *arc_loan_buf(spa_t *spa, boolean_t is_metadata, int size);
 arc_buf_t *arc_loan_compressed_buf(spa_t *spa, uint64_t psize, uint64_t lsize,
-    enum zio_compress compression_type);
+    enum zio_compress compression_type, int32_t complevel);
 void arc_return_buf(arc_buf_t *buf, void *tag);
 void arc_loan_inuse_buf(arc_buf_t *buf, void *tag);
 void arc_buf_destroy(arc_buf_t *buf, void *tag);

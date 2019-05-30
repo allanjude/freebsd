@@ -28,6 +28,7 @@ CFLAGS+=-DBOOTPROG=\"gptzfsboot\" \
 	-I${ZFSSRC} \
 	-I${SYSDIR}/crypto/skein \
 	-I${SYSDIR}/cddl/boot/zfs \
+	-I${SYSDIR}/contrib/zstd/lib \
 	-I${BOOTSRC}/i386/btx/lib \
 	-I${BOOTSRC}/i386/boot2 \
 	-Wall -Waggregate-return -Wbad-function-cast \

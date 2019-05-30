@@ -2115,6 +2115,7 @@ spa_init(int mode)
 	metaslab_alloc_trace_init();
 	zio_init();
 	lz4_init();
+	zstd_init();
 	dmu_init();
 	zil_init();
 	vdev_cache_stat_init();
@@ -2145,6 +2146,7 @@ spa_fini(void)
 	zil_fini();
 	dmu_fini();
 	lz4_fini();
+	zstd_fini();
 	zio_fini();
 	metaslab_alloc_trace_fini();
 	range_tree_fini();

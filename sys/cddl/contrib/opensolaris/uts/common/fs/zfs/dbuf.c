@@ -1362,13 +1362,15 @@ dbuf_fix_old_data(dmu_buf_impl_t *db, uint64_t txg)
 		spa_t *spa = db->db_objset->os_spa;
 		enum zio_compress compress_type =
 		    arc_get_compression(db->db_buf);
+		int complevel = arc_get_complevel(db->db_buf);
 
 		if (compress_type == ZIO_COMPRESS_OFF) {
 			dr->dt.dl.dr_data = arc_alloc_buf(spa, db, type, size);
 		} else {
 			ASSERT3U(type, ==, ARC_BUFC_DATA);
 			dr->dt.dl.dr_data = arc_alloc_compressed_buf(spa, db,
-			    size, arc_buf_lsize(db->db_buf), compress_type);
+			    size, arc_buf_lsize(db->db_buf), compress_type,
+			    complevel);
 		}
 		bcopy(db->db.db_data, dr->dt.dl.dr_data->b_data, size);
 	} else {
@@ -2888,11 +2890,12 @@ dbuf_hold_copy(struct dbuf_hold_impl_data *dh)
 	arc_buf_t *data = dr->dt.dl.dr_data;
 
 	enum zio_compress compress_type = arc_get_compression(data);
+	int32_t complevel = arc_get_complevel(data);
 
 	if (compress_type != ZIO_COMPRESS_OFF) {
 		dbuf_set_data(db, arc_alloc_compressed_buf(
 		    dn->dn_objset->os_spa, db, arc_buf_size(data),
-		    arc_buf_lsize(data), compress_type));
+		    arc_buf_lsize(data), compress_type, complevel));
 	} else {
 		dbuf_set_data(db, arc_alloc_buf(dn->dn_objset->os_spa, db,
 		    DBUF_GET_BUFC_TYPE(db), db->db.db_size));
@@ -3642,6 +3645,7 @@ dbuf_sync_leaf(dbuf_dirty_record_t *dr, dmu_tx_t *tx)
 		int psize = arc_buf_size(*datap);
 		arc_buf_contents_t type = DBUF_GET_BUFC_TYPE(db);
 		enum zio_compress compress_type = arc_get_compression(*datap);
+		int32_t complevel = arc_get_complevel(*datap);
 
 		if (compress_type == ZIO_COMPRESS_OFF) {
 			*datap = arc_alloc_buf(os->os_spa, db, type, psize);
@@ -3649,7 +3653,7 @@ dbuf_sync_leaf(dbuf_dirty_record_t *dr, dmu_tx_t *tx)
 			ASSERT3U(type, ==, ARC_BUFC_DATA);
 			int lsize = arc_buf_lsize(*datap);
 			*datap = arc_alloc_compressed_buf(os->os_spa, db,
-			    psize, lsize, compress_type);
+			    psize, lsize, compress_type, complevel);
 		}
 		bcopy(db->db.db_data, (*datap)->b_data, psize);
 	}

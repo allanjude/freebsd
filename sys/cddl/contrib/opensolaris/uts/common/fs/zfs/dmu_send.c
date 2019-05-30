@@ -848,6 +848,11 @@ dmu_send_impl(void *tag, dsl_pool_t *dp, dsl_dataset_t *to_ds,
 	    0 && spa_feature_is_active(dp->dp_spa, SPA_FEATURE_LZ4_COMPRESS)) {
 		featureflags |= DMU_BACKUP_FEATURE_LZ4;
 	}
+/* XXX: Allan: should be able to use embedok without implying ZSTD */
+	if ((featureflags &
+	    (DMU_BACKUP_FEATURE_EMBED_DATA | DMU_BACKUP_FEATURE_COMPRESSED)) !=
+	    0 && to_ds->ds_feature_inuse[SPA_FEATURE_ZSTD_COMPRESS])
+		featureflags |= DMU_BACKUP_FEATURE_ZSTD;
 
 	if (resumeobj != 0 || resumeoff != 0) {
 		featureflags |= DMU_BACKUP_FEATURE_RESUMING;
@@ -1441,6 +1446,13 @@ dmu_recv_begin_check(void *arg, dmu_tx_t *tx)
 	 */
 	if ((featureflags & DMU_BACKUP_FEATURE_LARGE_BLOCKS) &&
 	    !spa_feature_is_enabled(dp->dp_spa, SPA_FEATURE_LARGE_BLOCKS))
+		return (SET_ERROR(ENOTSUP));
+
+	if ((featureflags & DMU_BACKUP_FEATURE_ZSTD) &&
+	    !spa_feature_is_enabled(dp->dp_spa, SPA_FEATURE_ZSTD_COMPRESS))
+		return (SET_ERROR(ENOTSUP));
+
+	if (!(DMU_STREAM_SUPPORTED(featureflags)))
 		return (SET_ERROR(ENOTSUP));
 
 	/*
@@ -2755,10 +2767,11 @@ receive_read_record(struct receive_arg *ra)
 			ASSERT3U(drrw->drr_logical_size, >=,
 			    drrw->drr_compressed_size);
 			ASSERT(!is_meta);
+			/* XXX: Allan: need complevel */
 			abuf = arc_loan_compressed_buf(
 			    dmu_objset_spa(ra->os),
 			    drrw->drr_compressed_size, drrw->drr_logical_size,
-			    drrw->drr_compressiontype);
+			    drrw->drr_compressiontype, 0);
 		} else {
 			abuf = arc_loan_buf(dmu_objset_spa(ra->os),
 			    is_meta, drrw->drr_logical_size);

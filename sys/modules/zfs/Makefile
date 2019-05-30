@@ -72,6 +72,11 @@ SRCS+=	sha256c.c sha512c.c
 .PATH:	${SYSDIR}/crypto/skein
 SRCS+=	skein.c skein_block.c
 
+.PATH: ${SYSDIR}/contrib/zstd/lib
+CFLAGS+=-I${SYSDIR}/contrib/zstd/lib
+CFLAGS+=-I${SYSDIR}/contrib/zstd/lib/freebsd
+CFLAGS+=-I${SYSDIR}/contrib/zstd/lib/common
+
 .PATH:	${SUNW}/common/zfs
 .include "${SUNW}/uts/common/Makefile.files"
 .PATH:	${SUNW}/uts/common/fs/zfs

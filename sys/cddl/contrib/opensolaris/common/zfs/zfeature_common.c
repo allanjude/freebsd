@@ -286,4 +286,9 @@ zpool_feature_init(void)
 	    "Reduce memory used by removed devices when their blocks are "
 	    "freed or remapped.",
 	    ZFEATURE_FLAG_READONLY_COMPAT, obsolete_counts_deps);
+
+	zfeature_register(SPA_FEATURE_ZSTD_COMPRESS,
+	    "org.freebsd:zstd_compress", "zstd_compress",
+	    "zstd compression algorithm support.",
+	    ZFEATURE_FLAG_PER_DATASET, NULL);
 }

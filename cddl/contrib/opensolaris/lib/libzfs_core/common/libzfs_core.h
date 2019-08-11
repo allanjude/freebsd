@@ -102,6 +102,9 @@ int lzc_channel_program_nosync(const char *, const char *, uint64_t,
 int lzc_pool_checkpoint(const char *);
 int lzc_pool_checkpoint_discard(const char *);
 
+int lzc_get_vdev_prop(const char *, nvlist_t *, nvlist_t **);
+int lzc_set_vdev_prop(const char *, nvlist_t *, nvlist_t **);
+
 #ifdef	__cplusplus
 }
 #endif

@@ -96,6 +96,13 @@ zprop_type_t zpool_prop_get_type(zpool_prop_t);
 zprop_desc_t *zpool_prop_get_table(void);
 
 /*
+ * vdev property functions
+ */
+void vdev_prop_init(void);
+zprop_type_t vdev_prop_get_type(vdev_prop_t prop);
+zprop_desc_t *vdev_prop_get_table(void);
+
+/*
  * Common routines to initialize property tables
  */
 void zprop_register_impl(int, const char *, zprop_type_t, uint64_t,

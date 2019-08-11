@@ -42,6 +42,7 @@
 #endif
 
 static zprop_desc_t zpool_prop_table[ZPOOL_NUM_PROPS];
+static zprop_desc_t vdev_prop_table[VDEV_NUM_PROPS];
 
 zprop_desc_t *
 zpool_prop_get_table(void)
@@ -245,3 +246,163 @@ zpool_prop_align_right(zpool_prop_t prop)
 	return (zpool_prop_table[prop].pd_rightalign);
 }
 #endif
+
+zprop_desc_t *
+vdev_prop_get_table(void)
+{
+	return (vdev_prop_table);
+}
+
+void
+vdev_prop_init(void)
+{
+	static zprop_index_t boolean_table[] = {
+		{ "off",	0},
+		{ "on",		1},
+		{ NULL }
+	};
+
+	/* string properties */
+	zprop_register_string(VDEV_PROP_COMMENT, "comment", NULL,
+	    PROP_DEFAULT, ZFS_TYPE_VDEV, "<comment-string>", "COMMENT");
+
+	/* readonly number properties */
+	zprop_register_number(VDEV_PROP_SIZE, "size", 0, PROP_READONLY,
+	    ZFS_TYPE_VDEV, "<size>", "SIZE");
+	zprop_register_number(VDEV_PROP_FREE, "free", 0, PROP_READONLY,
+	    ZFS_TYPE_VDEV, "<size>", "FREE");
+	zprop_register_number(VDEV_PROP_ALLOCATED, "allocated", 0,
+	    PROP_READONLY, ZFS_TYPE_VDEV, "<size>", "ALLOC");
+	zprop_register_number(VDEV_PROP_EXPANDSZ, "expandsize", 0,
+	    PROP_READONLY, ZFS_TYPE_VDEV, "<size>", "EXPANDSZ");
+	zprop_register_number(VDEV_PROP_FRAGMENTATION, "fragmentation", 0,
+	    PROP_READONLY, ZFS_TYPE_VDEV, "<percent>", "FRAG");
+	zprop_register_number(VDEV_PROP_CAPACITY, "capacity", 0, PROP_READONLY,
+	    ZFS_TYPE_VDEV, "<size>", "CAP");
+	zprop_register_number(VDEV_PROP_GUID, "guid", 0, PROP_READONLY,
+	    ZFS_TYPE_VDEV, "<guid>", "GUID");
+	zprop_register_number(VDEV_PROP_STATE, "STATE", 0, PROP_READONLY,
+	    ZFS_TYPE_VDEV, "<state>", "STATE");
+	zprop_register_number(VDEV_PROP_BOOTSIZE, "bootsize", 0, PROP_READONLY,
+	    ZFS_TYPE_VDEV, "<size>", "BOOTSIZE");
+	zprop_register_number(VDEV_PROP_ASIZE, "asize", 0, PROP_READONLY,
+	    ZFS_TYPE_VDEV, "<asize>", "ASIZE");
+	zprop_register_number(VDEV_PROP_PSIZE, "psize", 0, PROP_READONLY,
+	    ZFS_TYPE_VDEV, "<psize>", "PSIZE");
+	zprop_register_number(VDEV_PROP_ASHIFT, "ashift", 0, PROP_READONLY,
+	    ZFS_TYPE_VDEV, "<ashift>", "ASHIFT");
+	zprop_register_number(VDEV_PROP_ROTATION_RATE, "rotation_rate", 0,
+	    PROP_READONLY, ZFS_TYPE_VDEV, "<rotation_rate>", "ROTRATE");
+
+	/* default index (boolean) properties */
+	zprop_register_index(VDEV_PROP_READONLY, "readonly", 0,
+	    PROP_DEFAULT, ZFS_TYPE_VDEV, "on | off", "RDONLY", boolean_table);
+
+	/* default index properties */
+
+	/* hidden properties */
+	zprop_register_hidden(VDEV_PROP_NAME, "name", PROP_TYPE_STRING,
+	    PROP_READONLY, ZFS_TYPE_VDEV, "NAME");
+}
+
+/*
+ * Given a property name and its type, returns the corresponding property ID.
+ */
+vdev_prop_t
+vdev_name_to_prop(const char *propname)
+{
+	char vdevprop[MAXPATHLEN] = { 0 };
+	char *vpname = (char *)&vdevprop;
+	char *atsign = NULL;
+
+	strlcpy(vpname, propname, sizeof(vdevprop));
+	atsign = strchr(vpname, '@');
+	if (atsign != NULL)
+		*atsign= '\0';
+
+	return (zprop_name_to_prop((const char *)vpname, ZFS_TYPE_VDEV));
+}
+
+/*
+ * Given a pool property ID, returns the corresponding name.
+ * Assuming the pool propety ID is valid.
+ */
+const char *
+vdev_prop_to_name(vdev_prop_t prop)
+{
+	return (vdev_prop_table[prop].pd_name);
+}
+
+zprop_type_t
+vdev_prop_get_type(vdev_prop_t prop)
+{
+	return (vdev_prop_table[prop].pd_proptype);
+}
+
+boolean_t
+vdev_prop_readonly(vdev_prop_t prop)
+{
+	return (vdev_prop_table[prop].pd_attr == PROP_READONLY);
+}
+
+const char *
+vdev_prop_default_string(vdev_prop_t prop)
+{
+	return (vdev_prop_table[prop].pd_strdefault);
+}
+
+uint64_t
+vdev_prop_default_numeric(vdev_prop_t prop)
+{
+	return (vdev_prop_table[prop].pd_numdefault);
+}
+
+int
+vdev_prop_string_to_index(vdev_prop_t prop, const char *string,
+    uint64_t *index)
+{
+	return (zprop_string_to_index(prop, string, index, ZFS_TYPE_VDEV));
+}
+
+int
+vdev_prop_index_to_string(vdev_prop_t prop, uint64_t index,
+    const char **string)
+{
+	return (zprop_index_to_string(prop, index, string, ZFS_TYPE_VDEV));
+}
+
+/*
+ * Returns true if this is a valid vdev property.
+ */
+boolean_t
+zpool_prop_vdev(const char *name)
+{
+	return (vdev_name_to_prop(name) != VDEV_PROP_INVAL);
+}
+
+uint64_t
+vdev_prop_random_value(vdev_prop_t prop, uint64_t seed)
+{
+	return (zprop_random_value(prop, seed, ZFS_TYPE_VDEV));
+}
+
+#ifndef _KERNEL
+const char *
+vdev_prop_values(vdev_prop_t prop)
+{
+	return (vdev_prop_table[prop].pd_values);
+}
+
+const char *
+vdev_prop_column_name(vdev_prop_t prop)
+{
+	return (vdev_prop_table[prop].pd_colname);
+}
+
+boolean_t
+vdev_prop_align_right(vdev_prop_t prop)
+{
+	return (vdev_prop_table[prop].pd_rightalign);
+}
+#endif
+

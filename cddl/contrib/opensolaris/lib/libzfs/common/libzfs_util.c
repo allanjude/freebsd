@@ -681,6 +681,7 @@ libzfs_init(void)
 	zfs_prop_init();
 	zpool_prop_init();
 	zpool_feature_init();
+	vdev_prop_init();
 	libzfs_mnttab_init(hdl);
 
 	if (getenv("ZFS_PROP_DEBUG") != NULL) {
@@ -921,7 +922,8 @@ zprop_print_headers(zprop_get_cbdata_t *cbp, zfs_type_t type)
 
 	/* first property is always NAME */
 	assert(cbp->cb_proplist->pl_prop ==
-	    ((type == ZFS_TYPE_POOL) ?  ZPOOL_PROP_NAME : ZFS_PROP_NAME));
+	    ((type == ZFS_TYPE_POOL) ?  ZPOOL_PROP_NAME :
+	    (type == ZFS_TYPE_VDEV) ? VDEV_PROP_NAME : ZFS_PROP_NAME));
 
 	/*
 	 * Go through and calculate the widths for each column.  For the
@@ -1239,6 +1241,9 @@ zprop_parse_value(libzfs_handle_t *hdl, nvpair_t *elem, int prop,
 	if (type == ZFS_TYPE_POOL) {
 		proptype = zpool_prop_get_type(prop);
 		propname = zpool_prop_to_name(prop);
+	} else if (type == ZFS_TYPE_VDEV) {
+		proptype = vdev_prop_get_type(prop);
+		propname = vdev_prop_to_name(prop);
 	} else {
 		proptype = zfs_prop_get_type(prop);
 		propname = zfs_prop_to_name(prop);
@@ -1390,7 +1395,7 @@ addlist(libzfs_handle_t *hdl, char *propname, zprop_list_t **listp,
 	 */
 	if (prop == ZPROP_INVAL && ((type == ZFS_TYPE_POOL &&
 	    !zpool_prop_feature(propname) &&
-	    !zpool_prop_unsupported(propname)) ||
+	    !zpool_prop_unsupported(propname) && !zpool_prop_vdev(propname)) ||
 	    (type == ZFS_TYPE_DATASET && !zfs_prop_user(propname) &&
 	    !zfs_prop_userquota(propname) && !zfs_prop_written(propname)))) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,

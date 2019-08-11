@@ -2069,6 +2069,7 @@ spa_init(int mode)
 	zfs_prop_init();
 	zpool_prop_init();
 	zpool_feature_init();
+	vdev_prop_init();
 	spa_config_load();
 	l2arc_start();
 	scan_init();

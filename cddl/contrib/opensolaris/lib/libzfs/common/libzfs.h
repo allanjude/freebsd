@@ -307,6 +307,17 @@ extern const char *zpool_prop_to_name(zpool_prop_t);
 extern const char *zpool_prop_values(zpool_prop_t);
 
 /*
+ * Functions to manage vdev properties
+ */
+extern int zpool_set_vdev_prop(zpool_handle_t *, const char *, const char *);
+extern int zpool_get_vdev_prop(zpool_handle_t *, const char *, vdev_prop_t,
+    char *, size_t, zprop_source_t *, boolean_t);
+extern int zpool_get_all_vdev_props(zpool_handle_t *, const char *, nvlist_t **);
+
+extern const char *vdev_prop_to_name(vdev_prop_t);
+extern const char *vdev_prop_values(vdev_prop_t);
+
+/*
  * Pool health statistics.
  */
 typedef enum {

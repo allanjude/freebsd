@@ -3009,6 +3009,78 @@ zfs_ioc_pool_get_props(zfs_cmd_t *zc)
 }
 
 /*
+ * innvl: {
+ *     "vdev" -> guid
+ *     (optional) "props" -> { prop -> value }
+ * }
+ *
+ * outnvl: propname -> error code (int32)
+ */
+static int
+zfs_ioc_vdev_set_props(const char *poolname, nvlist_t *innvl, nvlist_t *outnvl)
+{
+	spa_t *spa;
+	int error;
+	vdev_t *vd;
+	uint64_t vdev_guid;
+
+	/* Early validation */
+	if (nvlist_lookup_uint64(innvl, "vdev", &vdev_guid) != 0)
+		return (SET_ERROR(EINVAL));
+
+	if ((error = spa_open(poolname, &spa, FTAG)) != 0)
+		return (error);
+
+	ASSERT(spa_writeable(spa));
+
+	if ((vd = spa_lookup_by_guid(spa, vdev_guid, B_TRUE)) == NULL) {
+		spa_close(spa, FTAG);
+		return (ENOENT);
+	}
+
+	error = vdev_prop_set(vd, innvl, outnvl);
+
+	spa_close(spa, FTAG);
+
+	return (error);
+}
+
+/*
+ * innvl: {
+ *     "vdev" -> guid
+ *     (optional) "props" -> { propname -> propid }
+ * }
+ *
+ * outnvl: propname -> value
+ */
+static int
+zfs_ioc_vdev_get_props(const char *poolname, nvlist_t *innvl, nvlist_t *outnvl)
+{
+	spa_t *spa;
+	int error;
+	vdev_t *vd;
+	uint64_t vdev_guid;
+
+	/* Early validation */
+	if (nvlist_lookup_uint64(innvl, "vdev", &vdev_guid) != 0)
+		return (SET_ERROR(EINVAL));
+
+	if ((error = spa_open(poolname, &spa, FTAG)) != 0)
+		return (error);
+
+	if ((vd = spa_lookup_by_guid(spa, vdev_guid, B_TRUE)) == NULL) {
+		spa_close(spa, FTAG);
+		return (ENOENT);
+	}
+
+	error = vdev_prop_get(vd, innvl, outnvl);
+
+	spa_close(spa, FTAG);
+
+	return (error);
+}
+
+/*
  * inputs:
  * zc_name		name of filesystem
  * zc_nvlist_src{_size}	nvlist of delegated permissions
@@ -6227,6 +6299,14 @@ zfs_ioctl_init(void)
 	    ZFS_IOC_POOL_DISCARD_CHECKPOINT, zfs_ioc_pool_discard_checkpoint,
 	    zfs_secpolicy_config, POOL_NAME,
 	    POOL_CHECK_SUSPENDED | POOL_CHECK_READONLY, B_TRUE, B_TRUE);
+
+	zfs_ioctl_register("zpool_vdev_get_props", ZFS_IOC_VDEV_GET_PROPS,
+	    zfs_ioc_vdev_get_props, zfs_secpolicy_read, POOL_NAME,
+	    POOL_CHECK_NONE, B_FALSE, B_FALSE);
+
+	zfs_ioctl_register("zpool_vdev_set_props", ZFS_IOC_VDEV_SET_PROPS,
+	    zfs_ioc_vdev_set_props, zfs_secpolicy_config, POOL_NAME,
+	    POOL_CHECK_SUSPENDED | POOL_CHECK_READONLY, B_FALSE, B_FALSE);
 
 	zfs_ioctl_register("initialize", ZFS_IOC_POOL_INITIALIZE,
 	    zfs_ioc_pool_initialize, zfs_secpolicy_config, POOL_NAME,

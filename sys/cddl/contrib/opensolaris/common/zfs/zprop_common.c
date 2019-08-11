@@ -54,6 +54,8 @@ zprop_get_proptable(zfs_type_t type)
 {
 	if (type == ZFS_TYPE_POOL)
 		return (zpool_prop_get_table());
+	else if (type == ZFS_TYPE_VDEV)
+		return (vdev_prop_get_table());
 	else
 		return (zfs_prop_get_table());
 }
@@ -63,6 +65,8 @@ zprop_get_numprops(zfs_type_t type)
 {
 	if (type == ZFS_TYPE_POOL)
 		return (ZPOOL_NUM_PROPS);
+	else if (type == ZFS_TYPE_VDEV)
+		return (VDEV_NUM_PROPS);
 	else
 		return (ZFS_NUM_PROPS);
 }
@@ -214,6 +218,8 @@ propname_match(const char *p, size_t len, zprop_desc_t *prop_entry)
 	const char *colname = prop_entry->pd_colname;
 	int c;
 #endif
+
+	ASSERT(propname != NULL);
 
 	if (len == strlen(propname) &&
 	    strncmp(p, propname, len) == 0)

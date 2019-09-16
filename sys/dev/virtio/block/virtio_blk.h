@@ -78,7 +78,8 @@ struct virtio_blk_config {
 
 	/* Writeback mode (if VIRTIO_BLK_F_CONFIG_WCE) */
 	uint8_t writeback;
-	uint8_t unused0[3];
+	uint8_t unused0[1];
+	uint16_t num_queues;
 	uint32_t max_discard_sectors;
 	uint32_t max_discard_seg;
 	uint32_t discard_sector_alignment;

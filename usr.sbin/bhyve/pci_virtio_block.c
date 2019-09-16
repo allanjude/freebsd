@@ -113,7 +113,8 @@ struct vtblk_config {
 		uint32_t opt_io_size;
 	} vbc_topology;
 	uint8_t		vbc_writeback;
-	uint8_t		unused0[3];
+	uint8_t		unused0[1];
+	uint16_t	num_queues;
 	uint32_t	max_discard_sectors;
 	uint32_t	max_discard_seg;
 	uint32_t	discard_sector_alignment;

@@ -941,7 +941,7 @@ vtblk_request_execute(struct vtblk_softc *sc, struct vtblk_request *req)
 	} else if (bp->bio_cmd == BIO_DELETE) {
 		struct virtio_blk_discard_write_zeroes discard;
 
-		discard.sector = bp->bio_pblkno;
+		discard.sector = bp->bio_offset / 512;
 		discard.num_sectors = bp->bio_bcount / 512;
 		error = sglist_append(sg, &discard, sizeof(discard));
 		if (error || sg->sg_nseg == sg->sg_maxseg) {

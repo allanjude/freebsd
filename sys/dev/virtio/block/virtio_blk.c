@@ -726,6 +726,12 @@ vtblk_alloc_disk(struct vtblk_softc *sc, struct virtio_blk_config *blkcfg)
 		    dp->d_stripesize;
 	}
 
+	if (virtio_with_feature(dev, VIRTIO_BLK_F_DISCARD)) {
+		dp->d_flags |= DISKFLAG_CANDELETE;
+		dp->d_delmaxsize = blkcfg->max_discard_sectors *
+		    dp->d_sectorsize;
+	}
+
 	if (vtblk_write_cache_enabled(sc, blkcfg) != 0)
 		sc->vtblk_write_cache = VTBLK_CACHE_WRITEBACK;
 	else

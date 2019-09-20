@@ -91,21 +91,30 @@ static int dn_gone;
 static struct task	dn_task;
 static struct taskqueue	*dn_tq = NULL;
 
+VNET_DEFINE(struct callout, dn_timeout);
+#define V_dn_timeout	VNET(dn_timeout)
+VNET_DEFINE(int, dn_gone);
+#define V_dn_gone	VNET(dn_gone)
+VNET_DEFINE(struct task, dn_task);
+#define V_dn_task	VNET(dn_task)
+VNET_DEFINE(struct taskqueue *, dn_tq);
+#define V_dn_tq		VNET(dn_tq)
+
 static void
 dummynet(void *arg)
 {
 
 	(void)arg;	/* UNUSED */
-	taskqueue_enqueue(dn_tq, &dn_task);
+	taskqueue_enqueue(V_dn_tq, &V_dn_task);
 }
 
 void
 dn_reschedule(void)
 {
 
-	if (dn_gone != 0)
+	if (V_dn_gone != 0)
 		return;
-	callout_reset_sbt(&dn_timeout, tick_sbt, 0, dummynet, NULL,
+	callout_reset_sbt(&V_dn_timeout, tick_sbt, 0, dummynet, NULL,
 	    C_HARDCLOCK | C_DIRECT_EXEC);
 }
 /*----- end of callout hooks -----*/
@@ -2550,12 +2559,12 @@ ip_dn_init(void)
 
 	DN_LOCK_INIT();
 
-	TASK_INIT(&dn_task, 0, dummynet_task, curvnet);
-	dn_tq = taskqueue_create_fast("dummynet", M_WAITOK,
-	    taskqueue_thread_enqueue, &dn_tq);
-	taskqueue_start_threads(&dn_tq, 1, PI_NET, "dummynet");
+	TASK_INIT(&V_dn_task, 0, dummynet_task, curvnet);
+	V_dn_tq = taskqueue_create_fast("dummynet", M_WAITOK,
+	    taskqueue_thread_enqueue, &V_dn_tq);
+	taskqueue_start_threads(&V_dn_tq, 1, PI_NET, "dummynet");
 
-	callout_init(&dn_timeout, 1);
+	callout_init(&V_dn_timeout, 1);
 	dn_reschedule();
 
 	/* Initialize curr_time adjustment mechanics. */
@@ -2567,7 +2576,7 @@ ip_dn_destroy(int last)
 {
 	DN_BH_WLOCK();
 	/* ensure no more callouts are started */
-	dn_gone = 1;
+	V_dn_gone = 1;
 
 	/* check for last */
 	if (last) {
@@ -2579,9 +2588,9 @@ ip_dn_destroy(int last)
 	dummynet_flush();
 	DN_BH_WUNLOCK();
 
-	callout_drain(&dn_timeout);
-	taskqueue_drain(dn_tq, &dn_task);
-	taskqueue_free(dn_tq);
+	callout_drain(&V_dn_timeout);
+	taskqueue_drain(V_dn_tq, &V_dn_task);
+	taskqueue_free(V_dn_tq);
 
 	dn_ht_free(dn_cfg.schedhash, 0);
 	dn_ht_free(dn_cfg.fshash, 0);

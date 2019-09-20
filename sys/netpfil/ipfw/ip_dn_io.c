@@ -78,7 +78,7 @@ __FBSDID("$FreeBSD$");
 
 struct dn_parms _base_dn_cfg;
 
-VNET_DEFINE(struct dn_params, _base_dn_cfg);
+VNET_DEFINE(struct dn_parms, _base_dn_cfg);
 
 static long tick_last;		/* Last tick duration (usec). */
 static long tick_delta;		/* Last vs standard tick diff (usec). */

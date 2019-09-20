@@ -76,8 +76,6 @@ __FBSDID("$FreeBSD$");
  * instead of dn_cfg.curr_time
  */
 
-struct dn_parms _base_dn_cfg;
-
 VNET_DEFINE(struct dn_parms, _base_dn_cfg);
 
 static long tick_last;		/* Last tick duration (usec). */

@@ -86,18 +86,13 @@ struct schk_new_arg {
 };
 
 /*---- callout hooks. ----*/
-static struct callout dn_timeout;
-static int dn_gone;
-static struct task	dn_task;
-static struct taskqueue	*dn_tq = NULL;
-
-VNET_DEFINE(struct callout, dn_timeout);
+VNET_DEFINE_STATIC(struct callout, dn_timeout);
 #define V_dn_timeout	VNET(dn_timeout)
-VNET_DEFINE(int, dn_gone);
+VNET_DEFINE_STATIC(int, dn_gone);
 #define V_dn_gone	VNET(dn_gone)
-VNET_DEFINE(struct task, dn_task);
+VNET_DEFINE_STATIC(struct task, dn_task);
 #define V_dn_task	VNET(dn_task)
-VNET_DEFINE(struct taskqueue *, dn_tq);
+VNET_DEFINE_STATIC(struct taskqueue *, dn_tq);
 #define V_dn_tq		VNET(dn_tq)
 
 static void

@@ -76,8 +76,9 @@ __FBSDID("$FreeBSD$");
  * instead of dn_cfg.curr_time
  */
 
-struct dn_parms dn_cfg;
-//VNET_DEFINE(struct dn_parms, _base_dn_cfg);
+struct dn_parms _base_dn_cfg;
+
+VNET_DEFINE(struct dn_params, _base_dn_cfg);
 
 static long tick_last;		/* Last tick duration (usec). */
 static long tick_delta;		/* Last vs standard tick diff (usec). */
@@ -164,8 +165,7 @@ static SYSCTL_NODE(_net_inet_ip, OID_AUTO, dummynet, CTLFLAG_RW, 0, "Dummynet");
 #endif
 
 /* wrapper to pass dn_cfg fields to SYSCTL_* */
-//#define DC(x)	(&(VNET_NAME(_base_dn_cfg).x))
-#define DC(x)	(&(dn_cfg.x))
+#define DC(x)	(&(VNET_NAME(_base_dn_cfg).x))
 /* parameters */
 
 

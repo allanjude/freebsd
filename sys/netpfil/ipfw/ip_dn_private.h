@@ -402,9 +402,8 @@ enum {
 	PROTO_IFB =	0x0c, /* layer2 + ifbridge */
 };
 
-extern struct dn_parms dn_cfg;
-//VNET_DECLARE(struct dn_parms, _base_dn_cfg);
-//#define dn_cfg	VNET(_base_dn_cfg)
+VNET_DECLARE(struct dn_parms, _base_dn_cfg);
+#define dn_cfg	VNET(_base_dn_cfg)
 
 int dummynet_io(struct mbuf **, struct ip_fw_args *);
 void dummynet_task(void *context, int pending);

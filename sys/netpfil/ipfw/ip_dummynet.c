@@ -2683,6 +2683,8 @@ static moduledata_t dummynet_mod = {
 
 #define	DN_SI_SUB	SI_SUB_PROTO_FIREWALL
 #define	DN_MODEV_ORD	(SI_ORDER_ANY - 128) /* after ipfw */
+#define DN_MODULE_ORDER           (DN_MODEV_ORD + 1)
+#define DN_VNET_ORDER             (DN_MODEV_ORD + 2)
 DECLARE_MODULE(dummynet, dummynet_mod, DN_SI_SUB, DN_MODEV_ORD);
 MODULE_DEPEND(dummynet, ipfw, 3, 3, 3);
 MODULE_VERSION(dummynet, 3);
@@ -2691,7 +2693,7 @@ MODULE_VERSION(dummynet, 3);
  * Starting up. Done in order after dummynet_modevent() has been called.
  * VNET_SYSINIT is also called for each existing vnet and each new vnet.
  */
-//VNET_SYSINIT(vnet_dn_init, DN_SI_SUB, DN_MODEV_ORD+2, ip_dn_init, NULL);
+VNET_SYSINIT(vnet_dn_init, DN_SI_SUB, DN_VNET_ORDER, ip_dn_init, NULL);
 
 /*
  * Shutdown handlers up shop. These are done in REVERSE ORDER, but still
@@ -2699,7 +2701,7 @@ MODULE_VERSION(dummynet, 3);
  * VNET_SYSUNINIT is also called for each exiting vnet as it exits.
  * or when the module is unloaded.
  */
-//VNET_SYSUNINIT(vnet_dn_uninit, DN_SI_SUB, DN_MODEV_ORD+2, ip_dn_destroy, NULL);
+VNET_SYSUNINIT(vnet_dn_uninit, DN_SI_SUB, DN_VNET_ORDER, ip_dn_destroy, NULL);
 
 #ifdef NEW_AQM
 

@@ -70,6 +70,18 @@
 /* Vector value used to disable MSI for queue. */
 #define VIRTIO_MSI_NO_VECTOR	0xFFFF
 
+/* IDs for different capabilities.  Must all exist. */
+
+/* Common configuration */
+#define	VIRTIO_PCI_CAP_COMMON_CFG	1
+/* Notifications */
+#define	VIRTIO_PCI_CAP_NOTIFY_CFG	2
+/* ISR access */
+#define	VIRTIO_PCI_CAP_ISR_CFG		3
+/* Device specific configuration */
+#define	VIRTIO_PCI_CAP_DEVICE_CFG	4
+/* PCI configuration access */
+#define	VIRTIO_PCI_CAP_PCI_CFG		5
 /*
  * The remaining space is defined by each driver as the per-driver
  * configuration space.

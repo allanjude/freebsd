@@ -254,10 +254,27 @@ struct vring_used {
  *
  * (We don't [yet?] ever use CONF_CHANGED.)
  */
-#define	VTCFG_ISR_QUEUES	0x01	/* re-scan queues */
-#define	VTCFG_ISR_CONF_CHANGED	0x80	/* configuration changed */
+/* The bit of the ISR which indicates a device has an interrupt. */
+#define	VTCFG_ISR_INTR		0x1
+/* The bit of the ISR which indicates a device configuration change. */
+#define	VTCFG_ISR_CONFIG	0x2
+/* Vector value used to disable MSI for queue. */
+#define VIRTIO_MSI_NO_VECTOR	0xFFFF
 
-#define	VIRTIO_MSI_NO_VECTOR	0xFFFF
+/*
+ * IDs for different capabilities.  Must all exist.
+ *
+ */
+/* Common configuration */
+#define VIRTIO_PCI_CAP_COMMON_CFG	1
+/* Notifications */
+#define VIRTIO_PCI_CAP_NOTIFY_CFG	2
+/* ISR access */
+#define VIRTIO_PCI_CAP_ISR_CFG		3
+/* Device specific configuration */
+#define VIRTIO_PCI_CAP_DEVICE_CFG	4
+/* PCI configuration access */
+#define VIRTIO_PCI_CAP_PCI_CFG		5
 
 /*
  * Feature flags.
@@ -442,7 +459,7 @@ vq_interrupt(struct virtio_softc *vs, struct vqueue_info *vq)
 		pci_generate_msix(vs->vs_pi, vq->vq_msix_idx);
 	else {
 		VS_LOCK(vs);
-		vs->vs_isr |= VTCFG_ISR_QUEUES;
+		vs->vs_isr |= VTCFG_ISR_INTR;
 		pci_generate_msi(vs->vs_pi, 0);
 		pci_lintr_assert(vs->vs_pi);
 		VS_UNLOCK(vs);

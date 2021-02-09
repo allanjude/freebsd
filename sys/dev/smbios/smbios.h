@@ -42,6 +42,8 @@ int smbios_get_structure_table(vm_paddr_t *table, vm_size_t *size);
 #define	SMBIOS_OFF	0
 #define	SMBIOS_LEN	4
 #define	SMBIOS_SIG	"_SM_"
+#define	SMBIOS3_LEN	5
+#define	SMBIOS3_SIG	"_SM3_"
 
 struct smbios_eps {
 	uint8_t		anchor_string[4];		/* '_SM_' */
@@ -58,6 +60,19 @@ struct smbios_eps {
 	uint32_t	structure_table_address;
 	uint16_t	number_structures;
 	uint8_t		BCD_revision;
+};
+
+struct smbios3_eps {
+	uint8_t		anchor_string[5];		/* '_SM3_' */
+	uint8_t		checksum;
+	uint8_t		length;
+	uint8_t		major_version;
+	uint8_t		minor_version;
+	uint8_t		docrev;
+	uint8_t		entry_point_revision;
+	uint8_t		reserved;
+	uint32_t	structure_table_max_size;
+	uint64_t	structure_table_address;
 };
 
 struct smbios_structure_header {

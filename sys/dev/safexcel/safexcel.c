@@ -1672,7 +1672,12 @@ safexcel_instr_sha_hash(struct safexcel_request *req,
 
 	/* Pass the input data to the hash engine. */
 	instr->opcode = SAFEXCEL_INSTR_OPCODE_DIRECTION;
-	instr->length = crp->crp_payload_length;
+
+	if (crp->crp_payload_length == 0)
+		instr->length = crypto_buffer_len(&crp->crp_buf);
+	else
+		instr->length = crp->crp_payload_length;
+
 	instr->status = SAFEXCEL_INSTR_STATUS_LAST_HASH;
 	instr->instructions = SAFEXCEL_INSTR_DEST_HASH;
 	instr++;

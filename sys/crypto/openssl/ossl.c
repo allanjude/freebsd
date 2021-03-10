@@ -236,7 +236,7 @@ ossl_process_hash(struct ossl_session *s, struct cryptop *crp,
 	struct ossl_hash_context ctx;
 	char digest[HASH_MAX_LEN];
 	struct auth_hash *axf;
-	int error;
+	int error = 0;
 
 	axf = s->hash.axf;
 
@@ -255,14 +255,20 @@ ossl_process_hash(struct ossl_session *s, struct cryptop *crp,
 
 	if (crp->crp_aad != NULL)
 		error = axf->Update(&ctx, crp->crp_aad, crp->crp_aad_length);
-	else
+	else if (crp->crp_aad_length != 0)
 		error = crypto_apply(crp, crp->crp_aad_start,
 		    crp->crp_aad_length, axf->Update, &ctx);
+
 	if (error)
 		goto out;
 
-	error = crypto_apply(crp, crp->crp_payload_start,
-	    crp->crp_payload_length, axf->Update, &ctx);
+	if (crp->crp_aad_length == 0 && crp->crp_payload_length == 0)
+		error = crypto_apply_buf(&crp->crp_buf, crp->crp_digest_start,
+		    crypto_buffer_len(&crp->crp_buf), axf->Update, &ctx);
+	else
+		error = crypto_apply(crp, crp->crp_payload_start,
+		    crp->crp_payload_length, axf->Update, &ctx);
+
 	if (error)
 		goto out;
 

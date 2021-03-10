@@ -892,7 +892,7 @@ aesni_cipher_mac(struct aesni_session *ses, struct cryptop *crp,
 		if (crp->crp_aad != NULL)
 			ses->hash_update(&sctx, crp->crp_aad,
 			    crp->crp_aad_length);
-		else
+		else if (crp->crp_aad_length != 0)
 			crypto_apply(crp, crp->crp_aad_start,
 			    crp->crp_aad_length, ses->hash_update, &sctx);
 		if (CRYPTO_HAS_OUTPUT_BUFFER(crp) &&
@@ -901,6 +901,11 @@ aesni_cipher_mac(struct aesni_session *ses, struct cryptop *crp,
 			    crp->crp_payload_output_start,
 			    crp->crp_payload_length,
 			    ses->hash_update, &sctx);
+		else if (CRYPTO_HAS_OUTPUT_BUFFER(crp))
+		    crypto_apply_buf(&crp->crp_buf,
+			crp->crp_digest_start,
+			crypto_buffer_len(&crp->crp_buf),
+			ses->hash_update, &sctx);
 		else
 			crypto_apply(crp, crp->crp_payload_start,
 			    crp->crp_payload_length,

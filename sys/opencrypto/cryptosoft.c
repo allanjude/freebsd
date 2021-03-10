@@ -321,7 +321,7 @@ swcr_authcompute(struct swcr_session *ses, struct cryptop *crp)
 	struct swcr_auth *sw;
 	struct auth_hash *axf;
 	union authctx ctx;
-	int err;
+	int err = 0;
 
 	sw = &ses->swcr_auth;
 
@@ -337,7 +337,7 @@ swcr_authcompute(struct swcr_session *ses, struct cryptop *crp)
 
 	if (crp->crp_aad != NULL)
 		err = axf->Update(&ctx, crp->crp_aad, crp->crp_aad_length);
-	else
+	else if (crp->crp_aad_length != 0)
 		err = crypto_apply(crp, crp->crp_aad_start, crp->crp_aad_length,
 		    axf->Update, &ctx);
 	if (err)
@@ -348,6 +348,9 @@ swcr_authcompute(struct swcr_session *ses, struct cryptop *crp)
 		err = crypto_apply_buf(&crp->crp_obuf,
 		    crp->crp_payload_output_start, crp->crp_payload_length,
 		    axf->Update, &ctx);
+	else if (CRYPTO_HAS_OUTPUT_BUFFER(crp) )
+		err = crypto_apply_buf(&crp->crp_buf, crp->crp_digest_start,
+		    crypto_buffer_len(&crp->crp_buf), axf->Update, &ctx);
 	else
 		err = crypto_apply(crp, crp->crp_payload_start,
 		    crp->crp_payload_length, axf->Update, &ctx);

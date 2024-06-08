@@ -1,4 +1,4 @@
-.\"     $OpenBSD: nc.1,v 1.68 2015/03/26 10:35:04 tobias Exp $
+.\"     $OpenBSD: nc.1,v 1.97 2022/09/11 09:58:06 schwarze Exp $
 .\"
 .\" Copyright (c) 1996 David Sacerdote
 .\" All rights reserved.
@@ -25,9 +25,7 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd January 17, 2023
+.Dd $Mdocdate: January 17, 2023 $
 .Dt NC 1
 .Os
 .Sh NAME
@@ -35,30 +33,29 @@
 .Nd arbitrary TCP and UDP connections and listens
 .Sh SYNOPSIS
 .Nm nc
-.Bk -words
 .Op Fl 46DdEFhklMNnrStUuvz
+.Op Fl -crlf
 .Op Fl e Ar IPsec_policy
 .Op Fl I Ar length
 .Op Fl i Ar interval
 .Op Fl -no-tcpopt
-.Op Fl -sctp
-.Op Fl -crlf
+.Op Fl M Ar ttl
+.Op Fl m Ar minttl
 .Op Fl O Ar length
 .Op Fl P Ar proxy_username
 .Op Fl p Ar source_port
-.Op Fl s Ar source
+.Op Fl s Ar sourceaddr
+.Op Fl -sctp
+.Op Fl -stats
 .Op Fl T Ar toskeyword
 .Op Fl -tun Ar tundev
 .Op Fl V Ar rtable
+.Op Fl W Ar recvlimit
 .Op Fl w Ar timeout
 .Op Fl X Ar proxy_protocol
-.Oo Xo
-.Fl x Ar proxy_address Ns Oo : Ns
-.Ar port Oc
-.Xc Oc
+.Op Fl x Ar proxy_address Ns Op : Ns Ar port
 .Op Ar destination
 .Op Ar port
-.Ek
 .Sh DESCRIPTION
 The
 .Nm
@@ -98,13 +95,9 @@ and much, much more
 The options are as follows:
 .Bl -tag -width Ds
 .It Fl 4
-Forces
-.Nm
-to use IPv4 addresses only.
+Use IPv4 addresses only.
 .It Fl 6
-Forces
-.Nm
-to use IPv6 addresses only.
+Use IPv6 addresses only.
 .It Fl -crlf
 Convert LF into CRLF when sending data over the network.
 .It Fl D
@@ -115,7 +108,7 @@ Do not attempt to read from stdin.
 Shortcut for
 .Qo
 .Li "-e 'in ipsec esp/transport//require'"
-.Li "-e 'out ipsec esp/transport//require'" 
+.Li "-e 'out ipsec esp/transport//require'"
 .Qc ,
 which enables IPsec ESP transport mode in both
 directions.
@@ -140,47 +133,46 @@ using the
 .Xr ssh_config 5
 .Cm ProxyUseFdpass
 option).
+Cannot be used with
+.Fl U .
 .It Fl h
-Prints out
+Print out the
 .Nm
-help.
+help text and exit.
 .It Fl I Ar length
-Specifies the size of the TCP receive buffer.
+Specify the size of the TCP receive buffer.
 .It Fl i Ar interval
-Specifies a delay time interval between lines of text sent and received.
+Sleep for
+.Ar interval
+seconds between lines of text sent and received.
 Also causes a delay time between connections to multiple ports.
 .It Fl k
-Forces
-.Nm
-to stay listening for another connection after its current connection
-is completed.
-It is an error to use this option without the
-.Fl l
-option.
+When a connection is completed, listen for another one.
+Requires
+.Fl l .
 When used together with the
 .Fl u
 option, the server socket is not connected and it can receive UDP datagrams from
 multiple hosts.
 .It Fl l
-Used to specify that
-.Nm
-should listen for an incoming connection rather than initiate a
+Listen for an incoming connection rather than initiating a
 connection to a remote host.
-It is an error to use this option in conjunction with the
-.Fl p ,
-.Fl s ,
-or
-.Fl z
-options.
+Cannot be used together with any of the options
+.Fl psxz .
 Additionally, any timeouts specified with the
 .Fl w
 option are ignored.
-.It Fl M
+.It Fl -stats
 Collect per-connection TCP statistics using the
 .Xr stats 3
 framework and print them in JSON format to
 .Xr stderr 4
 after the connection is closed.
+.It Fl M Ar ttl
+Set the TTL / hop limit of outgoing packets.
+.It Fl m Ar minttl
+Ask the kernel to drop incoming packets whose TTL / hop limit is under
+.Ar minttl .
 .It Fl N
 .Xr shutdown 2
 the network socket after EOF on the input.
@@ -188,6 +180,7 @@ Some servers require this to finish their work.
 .It Fl n
 Do not do any DNS or service lookups on any specified addresses,
 hostnames or ports.
+If a name cannot be resolved without DNS, an error will be reported.
 .It Fl -no-tcpopt
 Disables the use of TCP options on the socket, by setting the boolean
 TCP_NOOPT
@@ -195,52 +188,51 @@ socket option.
 .It Fl -sctp
 Use SCTP instead of the default option of TCP.
 .It Fl O Ar length
-Specifies the size of the TCP send buffer.
+Specify the size of the TCP send buffer.
 .It Fl P Ar proxy_username
 Specifies a username to present to a proxy server that requires authentication.
 If no username is specified then authentication will not be attempted.
 Proxy authentication is only supported for HTTP CONNECT proxies at present.
 .It Fl p Ar source_port
-Specifies the source port
+Specify the source port
 .Nm
 should use, subject to privilege restrictions and availability.
-It is an error to use this option in conjunction with the
-.Fl l
-option.
+Cannot be used together with
+.Fl l .
 .It Fl r
-Specifies that source and/or destination ports should be chosen randomly
+Choose source and/or destination ports randomly
 instead of sequentially within a range or in the order that the system
 assigns them.
 .It Fl S
-Enables the RFC 2385 TCP MD5 signature option.
-.It Fl s Ar source
-Specifies the IP of the interface which is used to send the packets.
+Enable the RFC 2385 TCP MD5 signature option.
+.It Fl s Ar sourceaddr
+Set the source address to send packets from,
+which is useful on machines with multiple interfaces.
 For
 .Ux Ns -domain
 datagram sockets, specifies the local temporary socket file
 to create and use so that datagrams can be received.
-It is an error to use this option in conjunction with the
+Cannot be used together with
 .Fl l
-option.
-.It Fl T Ar toskeyword
-Change IPv4 TOS value.
-.Ar toskeyword
+or
+.Fl x .
+.It Fl T Ar keyword
+Change the IPv4 TOS/IPv6 traffic class value.
+.Ar keyword
 may be one of
-.Ar critical ,
-.Ar inetcontrol ,
-.Ar lowdelay ,
-.Ar netcontrol ,
-.Ar throughput ,
-.Ar reliability ,
+.Cm critical ,
+.Cm inetcontrol ,
+.Cm lowdelay ,
+.Cm netcontrol ,
+.Cm throughput ,
+.Cm reliability ,
 or one of the DiffServ Code Points:
-.Ar ef ,
-.Ar af11 ... af43 ,
-.Ar cs0 ... cs7 ;
+.Cm ef ,
+.Cm af11 No ... Cm af43 ,
+.Cm cs0 No ... Cm cs7 ;
 or a number in either hex or decimal.
 .It Fl t
-Causes
-.Nm
-to send RFC 854 DON'T and WON'T responses to RFC 854 DO and WILL requests.
+Send RFC 854 DON'T and WON'T responses to RFC 854 DO and WILL requests.
 This makes it possible to use
 .Nm
 to script telnet sessions.
@@ -251,11 +243,15 @@ to use the provided
 .Xr tun 4
 for input and output rather than the default of stdin and stdout.
 .It Fl U
-Specifies to use
+Use
 .Ux Ns -domain
 sockets.
+Cannot be used together with any of the options
+.Fl Fx .
 .It Fl u
-Use UDP instead of the default option of TCP.
+Use UDP instead of TCP.
+Cannot be used together with
+.Fl x .
 For
 .Ux Ns -domain
 sockets, use a datagram socket instead of a stream socket.
@@ -271,9 +267,11 @@ Set the routing table
 .Pq Dq FIB
 to be used.
 .It Fl v
-Have
-.Nm
-give more verbose output.
+Produce more verbose output.
+.It Fl W Ar recvlimit
+Terminate after receiving
+.Ar recvlimit
+packets from the network.
 .It Fl w Ar timeout
 Connections which cannot be established or are idle timeout after
 .Ar timeout
@@ -289,25 +287,20 @@ will listen forever for a connection, with or without the
 flag.
 The default is no timeout.
 .It Fl X Ar proxy_protocol
-Requests that
-.Nm
-should use the specified protocol when talking to the proxy server.
+Use
+.Ar proxy_protocol
+when talking to the proxy server.
 Supported protocols are
-.Dq 4
+.Cm 4
 (SOCKS v.4),
-.Dq 5
+.Cm 5
 (SOCKS v.5)
 and
-.Dq connect
+.Cm connect
 (HTTPS proxy).
 If the protocol is not specified, SOCKS version 5 is used.
-.It Xo
-.Fl x Ar proxy_address Ns Oo : Ns
-.Ar port Oc
-.Xc
-Requests that
-.Nm
-should connect to
+.It Fl x Ar proxy_address Ns Op : Ns Ar port
+Connect to
 .Ar destination
 using a proxy at
 .Ar proxy_address
@@ -317,13 +310,15 @@ If
 .Ar port
 is not specified, the well-known port for the proxy protocol is used (1080
 for SOCKS, 3128 for HTTPS).
+An IPv6 address can be specified unambiguously by enclosing
+.Ar proxy_address
+in square brackets.
+A proxy cannot be used with any of the options
+.Fl lsuU .
 .It Fl z
-Specifies that
-.Nm
-should just scan for listening daemons, without sending any data to them.
-It is an error to use this option in conjunction with the
-.Fl l
-option.
+Only scan for listening daemons, without sending any data to them.
+Cannot be used together with
+.Fl l .
 .El
 .Pp
 .Ar destination
@@ -344,8 +339,9 @@ sockets, a destination is required and is the socket path to connect to
 option is given).
 .Pp
 .Ar port
-can be a single integer or a range of ports.
-Ranges are in the form nn-mm.
+can be specified as a numeric port number or as a service name.
+Port ranges may be specified as numeric port numbers of the form
+.Ar nn Ns - Ns Ar mm .
 In general,
 a destination port must be specified,
 unless the
@@ -367,7 +363,7 @@ On a second console
 .Pq or a second machine ,
 connect to the machine and port being listened on:
 .Pp
-.Dl $ nc 127.0.0.1 1234
+.Dl $ nc -N 127.0.0.1 1234
 .Pp
 There should now be a connection between the ports.
 Anything typed at the second console will be concatenated to the first,
@@ -380,7 +376,10 @@ and which side is being used as a
 .Sq client .
 The connection may be terminated using an
 .Dv EOF
-.Pq Sq ^D .
+.Pq Sq ^D ,
+as the
+.Fl N
+flag was given.
 .Sh DATA TRANSFER
 The example in the previous section can be expanded to build a
 basic data transfer model.
@@ -392,13 +391,13 @@ Start by using
 .Nm
 to listen on a specific port, with output captured into a file:
 .Pp
-.Dl $ nc -l 1234 \*(Gt filename.out
+.Dl $ nc -l 1234 > filename.out
 .Pp
 Using a second machine, connect to the listening
 .Nm
 process, feeding it the file which is to be transferred:
 .Pp
-.Dl $ nc -N host.example.com 1234 \*(Lt filename.in
+.Dl $ nc -N host.example.com 1234 < filename.in
 .Pp
 After the file has been transferred, the connection will close automatically.
 .Sh TALKING TO SERVERS
@@ -422,10 +421,10 @@ More complicated examples can be built up when the user knows the format
 of requests required by the server.
 As another example, an email may be submitted to an SMTP server using:
 .Bd -literal -offset indent
-$ nc localhost 25 \*(Lt\*(Lt EOF
+$ nc localhost 25 << EOF
 HELO host.example.com
-MAIL FROM:\*(Ltuser@host.example.com\*(Gt
-RCPT TO:\*(Ltuser2@host.example.com\*(Gt
+MAIL FROM:<user@host.example.com>
+RCPT TO:<user2@host.example.com>
 DATA
 Body of email.
 \&.
@@ -522,8 +521,8 @@ if the proxy requires it:
 .Xr ssh 1 ,
 .Xr tcp 4
 .Sh AUTHORS
-Original implementation by *Hobbit*
-.Aq Mt hobbit@avian.org .
+Original implementation by
+.An *Hobbit* Aq Mt hobbit@avian.org .
 .br
 Rewritten with IPv6 support by
 .An Eric Jackson Aq Mt ericj@monkey.org .

@@ -1,4 +1,4 @@
-/*	$OpenBSD: socks.c,v 1.21 2015/03/26 21:19:51 tobias Exp $	*/
+/*	$OpenBSD: socks.c,v 1.31 2022/06/08 20:20:26 djm Exp $	*/
 
 /*
  * Copyright (c) 1999 Niklas Hallqvist.  All rights reserved.
@@ -53,7 +53,7 @@
 #define SOCKS_DOMAIN	3
 #define SOCKS_IPV6	4
 
-int	remote_connect(const char *, const char *, struct addrinfo);
+int	remote_connect(const char *, const char *, struct addrinfo, char *);
 int	socks_connect(const char *, const char *, struct addrinfo,
 	    const char *, const char *, struct addrinfo, int,
 	    const char *);
@@ -65,7 +65,7 @@ decode_addrport(const char *h, const char *p, struct sockaddr *addr,
 	int r;
 	struct addrinfo hints, *res;
 
-	bzero(&hints, sizeof(hints));
+	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = v4only ? PF_INET : PF_UNSPEC;
 	hints.ai_flags = numeric ? AI_NUMERICHOST : 0;
 	hints.ai_socktype = SOCK_STREAM;
@@ -109,17 +109,68 @@ proxy_read_line(int fd, char *buf, size_t bufsz)
 	return (off);
 }
 
-static const char *
-getproxypass(const char *proxyuser, const char *proxyhost)
+static void
+getproxypass(const char *proxyuser, const char *proxyhost,
+    char *pw, size_t pwlen)
 {
 	char prompt[512];
-	static char pw[256];
 
 	snprintf(prompt, sizeof(prompt), "Proxy password for %s@%s: ",
 	   proxyuser, proxyhost);
-	if (readpassphrase(prompt, pw, sizeof(pw), RPP_REQUIRE_TTY) == NULL)
+	if (readpassphrase(prompt, pw, pwlen, RPP_REQUIRE_TTY) == NULL)
 		errx(1, "Unable to read proxy passphrase");
-	return (pw);
+}
+
+/*
+ * Error strings adapted from the generally accepted SOCKSv4 spec:
+ *
+ * http://ftp.icm.edu.pl/packages/socks/socks4/SOCKS4.protocol
+ */
+static const char *
+socks4_strerror(int e)
+{
+	switch (e) {
+	case 90:
+		return "Succeeded";
+	case 91:
+		return "Request rejected or failed";
+	case 92:
+		return "SOCKS server cannot connect to identd on the client";
+	case 93:
+		return "Client program and identd report different user-ids";
+	default:
+		return "Unknown error";
+	}
+}
+
+/*
+ * Error strings taken almost directly from RFC 1928.
+ */
+static const char *
+socks5_strerror(int e)
+{
+	switch (e) {
+	case 0:
+		return "Succeeded";
+	case 1:
+		return "General SOCKS server failure";
+	case 2:
+		return "Connection not allowed by ruleset";
+	case 3:
+		return "Network unreachable";
+	case 4:
+		return "Host unreachable";
+	case 5:
+		return "Connection refused";
+	case 6:
+		return "TTL expired";
+	case 7:
+		return "Command not supported";
+	case 8:
+		return "Address type not supported";
+	default:
+		return "Unknown error";
+	}
 }
 
 int
@@ -136,7 +187,6 @@ socks_connect(const char *host, const char *port,
 	struct sockaddr_in *in4 = (struct sockaddr_in *)&addr;
 	struct sockaddr_in6 *in6 = (struct sockaddr_in6 *)&addr;
 	in_port_t serverport;
-	const char *proxypass = NULL;
 
 	if (proxyport == NULL)
 		proxyport = (socksv == -1) ? HTTP_PROXY_PORT : SOCKS_PORT;
@@ -151,7 +201,7 @@ socks_connect(const char *host, const char *port,
 	if (authretry++ > 3)
 		errx(1, "Too many authentication failures");
 
-	proxyfd = remote_connect(proxyhost, proxyport, proxyhints);
+	proxyfd = remote_connect(proxyhost, proxyport, proxyhints, NULL);
 
 	if (proxyfd < 0)
 		return (-1);
@@ -189,7 +239,7 @@ socks_connect(const char *host, const char *port,
 			buf[2] = 0;
 			buf[3] = SOCKS_DOMAIN;
 			buf[4] = hlen;
-			memcpy(buf + 5, host, hlen);			
+			memcpy(buf + 5, host, hlen);
 			memcpy(buf + 5 + hlen, &serverport, sizeof serverport);
 			wlen = 7 + hlen;
 			break;
@@ -225,8 +275,10 @@ socks_connect(const char *host, const char *port,
 		cnt = atomicio(read, proxyfd, buf, 4);
 		if (cnt != 4)
 			err(1, "read failed (%zu/4)", cnt);
-		if (buf[1] != 0)
-			errx(1, "connection failed, SOCKS error %d", buf[1]);
+		if (buf[1] != 0) {
+			errx(1, "connection failed, SOCKSv5 error: %s",
+			    socks5_strerror(buf[1]));
+		}
 		switch (buf[3]) {
 		case SOCKS_IPV4:
 			cnt = atomicio(read, proxyfd, buf + 4, 6);
@@ -261,13 +313,15 @@ socks_connect(const char *host, const char *port,
 		cnt = atomicio(read, proxyfd, buf, 8);
 		if (cnt != 8)
 			err(1, "read failed (%zu/8)", cnt);
-		if (buf[1] != 90)
-			errx(1, "connection failed, SOCKS error %d", buf[1]);
+		if (buf[1] != 90) {
+			errx(1, "connection failed, SOCKSv4 error: %s",
+			    socks4_strerror(buf[1]));
+		}
 	} else if (socksv == -1) {
 		/* HTTP proxy CONNECT */
 
 		/* Disallow bad chars in hostname */
-		if (strcspn(host, "\r\n\t []:") != strlen(host))
+		if (strcspn(host, "\r\n\t []") != strlen(host))
 			errx(1, "Invalid hostname");
 
 		/* Try to be sane about numeric IPv6 addresses */
@@ -280,7 +334,7 @@ socks_connect(const char *host, const char *port,
 			    "CONNECT %s:%d HTTP/1.0\r\n",
 			    host, ntohs(serverport));
 		}
-		if (r == -1 || (size_t)r >= sizeof(buf))
+		if (r < 0 || (size_t)r >= sizeof(buf))
 			errx(1, "hostname too long");
 		r = strlen(buf);
 
@@ -289,22 +343,27 @@ socks_connect(const char *host, const char *port,
 			err(1, "write failed (%zu/%d)", cnt, r);
 
 		if (authretry > 1) {
+			char proxypass[256];
 			char resp[1024];
 
-			proxypass = getproxypass(proxyuser, proxyhost);
+			getproxypass(proxyuser, proxyhost,
+			    proxypass, sizeof proxypass);
 			r = snprintf(buf, sizeof(buf), "%s:%s",
 			    proxyuser, proxypass);
+			explicit_bzero(proxypass, sizeof proxypass);
 			if (r == -1 || (size_t)r >= sizeof(buf) ||
 			    b64_ntop(buf, strlen(buf), resp,
 			    sizeof(resp)) == -1)
 				errx(1, "Proxy username/password too long");
 			r = snprintf(buf, sizeof(buf), "Proxy-Authorization: "
 			    "Basic %s\r\n", resp);
-			if (r == -1 || (size_t)r >= sizeof(buf))
+			if (r < 0 || (size_t)r >= sizeof(buf))
 				errx(1, "Proxy auth response too long");
 			r = strlen(buf);
 			if ((cnt = atomicio(vwrite, proxyfd, buf, r)) != r)
 				err(1, "write failed (%zu/%d)", cnt, r);
+			explicit_bzero(proxypass, sizeof proxypass);
+			explicit_bzero(buf, sizeof buf);
 		}
 
 		/* Terminate headers */
@@ -314,7 +373,8 @@ socks_connect(const char *host, const char *port,
 		/* Read status reply */
 		proxy_read_line(proxyfd, buf, sizeof(buf));
 		if (proxyuser != NULL &&
-		    strncmp(buf, "HTTP/1.0 407 ", 12) == 0) {
+		    (strncmp(buf, "HTTP/1.0 407 ", 12) == 0 ||
+		    strncmp(buf, "HTTP/1.1 407 ", 12) == 0)) {
 			if (authretry > 1) {
 				fprintf(stderr, "Proxy authentication "
 				    "failed\n");
